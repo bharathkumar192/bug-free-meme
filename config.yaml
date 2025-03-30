@@ -10,6 +10,8 @@ data:
 model:
   model_name: "google/gemma-3-12b-pt"  # Base model to fine-tune
   use_chat_template: true               # Whether to use chat formatting
+  chat_template: "{% for message in messages %}\n{% if message['role'] == 'user' %}\n<start_of_turn>user\n{{ message['content'] }}\n<end_of_turn>\n{% elif message['role'] == 'assistant' %}\n<start_of_turn>model\n{{ message['content'] }}\n<end_of_turn>\n{% endif %}\n{% endfor %}\n{% if add_generation_prompt %}\n<start_of_turn>model\n{% endif %}"
+
 
 training:
   num_train_epochs: 3                  # Number of training epochs
