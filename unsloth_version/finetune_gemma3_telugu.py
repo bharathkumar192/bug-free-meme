@@ -53,76 +53,60 @@ class TeluguDataProcessor:
         self.tokenizer = tokenizer
     
     def load_and_process_data(self):
-        """Load and process the Telugu dataset"""
+        """Load and process the Telugu dataset more efficiently"""
         logger.info(f"Loading dataset from {self.config['input_file']}")
         
         try:
             # Load the JSON file
             with open(self.config['input_file'], 'r', encoding='utf-8') as f:
-                raw_data = json.load(f)
+                questions = json.load(f).get('questions', [])
             
-            if 'questions' not in raw_data:
-                raise ValueError("Dataset does not contain 'questions' key")
+            if not questions:
+                raise ValueError("Dataset does not contain valid 'questions' data")
             
-            questions = raw_data['questions']
             logger.info(f"Loaded {len(questions)} examples from dataset")
             
-            # Process data into appropriate format for training
+            # Process and filter data in a single pass
             processed_data = []
-            
             for item in questions:
-                if 'question' not in item or 'response' not in item:
-                    continue
-                    
-                question = item['question'].strip()
-                response = item['response'].strip()
+                question = item.get('question', '').strip()
+                response = item.get('response', '').strip()
                 
-                if not question or not response:
-                    continue
-                
-                # Format data for chat template
-                conversation = [
-                    {"role": "user", "content": question},
-                    {"role": "assistant", "content": response}
-                ]
-                
-                processed_data.append({"conversations": conversation})
+                if question and response:
+                    processed_data.append({
+                        "conversations": [
+                            {"role": "user", "content": question},
+                            {"role": "assistant", "content": response}
+                        ]
+                    })
             
-            # Create Hugging Face dataset
+            # Create dataset and split
             dataset = Dataset.from_list(processed_data)
             logger.info(f"Processed {len(dataset)} valid examples")
             
-            # Standardize data format
-            dataset = standardize_data_formats(dataset)
-            
-            # Split dataset
             if self.config["eval_split"] > 0:
-                dataset = dataset.train_test_split(
-                    test_size=self.config["eval_split"], 
-                    seed=self.config["seed"]
-                )
-                train_dataset = dataset["train"]
-                eval_dataset = dataset["test"]
+                split = dataset.train_test_split(test_size=self.config["eval_split"], seed=self.config["seed"])
+                train_dataset, eval_dataset = split["train"], split["test"]
             else:
-                train_dataset = dataset
-                eval_dataset = None
+                train_dataset, eval_dataset = dataset, None
             
-            # Apply chat template
-            def tokenize_function(examples):
-                texts = self.tokenizer.apply_chat_template(examples["conversations"])
-                return {"text": texts}
+            # Apply chat template in a single mapping operation
+            train_dataset = train_dataset.map(
+                lambda x: {"text": self.tokenizer.apply_chat_template(x["conversations"])}, 
+                batched=True
+            )
             
-            train_dataset = train_dataset.map(tokenize_function, batched=True)
             if eval_dataset:
-                eval_dataset = eval_dataset.map(tokenize_function, batched=True)
-            
-            # Log dataset statistics
-            logger.info(f"Train dataset size: {len(train_dataset)}")
-            if eval_dataset:
-                logger.info(f"Evaluation dataset size: {len(eval_dataset)}")
+                eval_dataset = eval_dataset.map(
+                    lambda x: {"text": self.tokenizer.apply_chat_template(x["conversations"])}, 
+                    batched=True
+                )
+                logger.info(f"Train/eval datasets: {len(train_dataset)}/{len(eval_dataset)} examples")
+            else:
+                logger.info(f"Training dataset: {len(train_dataset)} examples")
             
             return train_dataset, eval_dataset
-            
+        
         except Exception as e:
             logger.error(f"Error processing dataset: {str(e)}")
             raise
@@ -174,11 +158,11 @@ class TeluguFineTuner:
                 self.config["use_wandb"] = False
     
     def setup_model_and_tokenizer(self):
-        """Initialize model and tokenizer with Unsloth for better compatibility and performance"""
-        logger.info(f"Loading model and tokenizer from {self.config['model_name']} using Unsloth")
+        """Initialize model and tokenizer with standard HuggingFace"""
+        logger.info(f"Loading model and tokenizer from {self.config['model_name']} using standard HuggingFace")
         
         try:
-            # Step 1: Load the tokenizer
+            # Load tokenizer
             tokenizer_kwargs = {
                 "trust_remote_code": True,
                 "token": self.config.get("hf_token", None)
@@ -190,35 +174,20 @@ class TeluguFineTuner:
                 logger.info("Setting pad_token to eos_token")
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             
-            # Step 2: Load the model with Unsloth - DO NOT SPECIFY load_in_4bit=False
-            # Instead, let Unsloth use its default optimizations
-            logger.info("Loading model with Unsloth for faster supervised fine-tuning")
-            
-            # For full parameter fine-tuning with Unsloth, use a small LoRA rank but make all parameters trainable
-            self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-                model_name=self.config["model_name"],
-                max_seq_length=self.config["max_seq_length"],
-                dtype=torch.bfloat16,  # Use BFloat16 for training stability
+            # Load model
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.config["model_name"],
+                device_map="auto",
+                torch_dtype=torch.bfloat16,
+                trust_remote_code=True,
                 token=self.config.get("hf_token", None),
-                full_finetuning=True,
-                logit_softcapping=1.0
             )
             
-            # Step 3: Configure for full fine-tuning using a minimal LoRA rank (8 is a good value)
-            # but setting all parameters as trainable
-            logger.info("Configuring model for full parameter fine-tuning via max-trainable LoRA")
-            # self.model = FastLanguageModel.get_peft_model(
-            #     self.model,
-            #     lora_alpha=16,  # Standard alpha value
-            #     lora_dropout=0,  # No dropout for full fine-tuning
-            #     bias="none",  # No bias
-            #     use_gradient_checkpointing=True,  # Enable gradient checkpointing
-            #     random_state=self.config["seed"],  # For reproducibility
-            #     use_rslora=False,  # Not using rank-stabilized LoRA
-            #     modules_to_save=["all"],  # This makes it equivalent to full fine-tuning
-            # )
+            # Enable gradient checkpointing for memory efficiency
+            if self.model.supports_gradient_checkpointing:
+                self.model.gradient_checkpointing_enable()
             
-            # Step 4: Set up the chat template
+            # Apply Gemma-3 chat template
             if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template is None:
                 # Apply Gemma-3 chat template
                 self.tokenizer = get_chat_template(
@@ -234,16 +203,8 @@ class TeluguFineTuner:
             logger.info(f"Model loaded successfully with {total_params:.2f}B parameters")
             logger.info(f"Trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
             
-            # Verify full fine-tuning is enabled
-            if trainable_params / total_params > 0.95:  # Allow for some parameters that might not be trainable
-                logger.info("FULL PARAMETER FINE-TUNING SUCCESSFULLY ENABLED WITH UNSLOTH!")
-                logger.info(f"All {trainable_params:.2f}B parameters will be updated during training")
-            else:
-                logger.warning(f"Only {trainable_params:.2f}B/{total_params:.2f}B parameters are trainable")
-                logger.warning("This may not be true full parameter fine-tuning")
-            
         except Exception as e:
-            logger.error(f"Error loading model or tokenizer with Unsloth: {str(e)}")
+            logger.error(f"Error loading model or tokenizer with standard HuggingFace: {str(e)}")
             raise
             
     def train(self):
