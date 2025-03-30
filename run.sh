@@ -335,6 +335,9 @@ main() {
   git lfs install
   git lfs pull
   git config --global credential.helper store
+  apt-get install -y libopenmpi-dev openmpi-bin
+  pip install mpi4py
+
 
 
 
