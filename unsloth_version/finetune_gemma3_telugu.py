@@ -192,7 +192,7 @@ class TeluguFineTuner:
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.config["model_name"],
                 # device_map="auto",
-                device_map=None
+                device_map=None,
                 torch_dtype=torch.bfloat16,
                 trust_remote_code=True,
                 token=self.config.get("hf_token", None),
