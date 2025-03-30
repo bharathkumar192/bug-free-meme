@@ -335,17 +335,25 @@ class LLMFineTuner:
                 padding_side="right",
                 truncation_side="right",
             )
+
+            logger.info(f"Config chat_template exists: {hasattr(self.config.model, 'chat_template')}")
+            if hasattr(self.config.model, 'chat_template'):
+                logger.info(f"Config chat_template value: {self.config.model.chat_template}")
+            logger.info(f"==Tokenizer has chat_template: {hasattr(self.tokenizer, 'chat_template')}")
+            if hasattr(self.tokenizer, 'chat_template'):
+                logger.info(f"==Tokenizer chat_template value: {self.tokenizer.chat_template}")
+
             
             # Ensure tokenizer has chat template if specified
             if self.config.model.use_chat_template:
-                if not hasattr(self.tokenizer, "chat_template"):
-                    if self.config.model.chat_template:
-                        logger.info("Using custom chat template from config")
-                        self.tokenizer.chat_template = self.config.model.chat_template
-                    else:
-                        logger.warning("Tokenizer does not have a chat template. Setting default template.")
-                        # Default Gemma-3 template
-                        self.tokenizer.chat_template = "{% for message in messages %}\n{% if message['role'] == 'user' %}\n<start_of_turn>user\n{{ message['content'] }}\n<end_of_turn>\n{% elif message['role'] == 'assistant' %}\n<start_of_turn>model\n{{ message['content'] }}\n<end_of_turn>\n{% endif %}\n{% endfor %}\n{% if add_generation_prompt %}\n<start_of_turn>model\n{% endif %}"
+                    # Force set the template from config if available
+                if hasattr(self.config.model, 'chat_template') and self.config.model.chat_template:
+                    logger.info("Setting custom chat template from config")
+                    self.tokenizer.chat_template = self.config.model.chat_template
+                else:
+                    logger.warning("No chat template in config. Setting default template.")
+                    # Default Gemma-3 template
+                    self.tokenizer.chat_template = "{% for message in messages %}\n{% if message['role'] == 'user' %}\n<start_of_turn>user\n{{ message['content'] }}\n<end_of_turn>\n{% elif message['role'] == 'assistant' %}\n<start_of_turn>model\n{{ message['content'] }}\n<end_of_turn>\n{% endif %}\n{% endfor %}\n{% if add_generation_prompt %}\n<start_of_turn>model\n{% endif %}"            
             
             if self.tokenizer.pad_token is None:
                 logger.info("Setting pad_token to eos_token")
