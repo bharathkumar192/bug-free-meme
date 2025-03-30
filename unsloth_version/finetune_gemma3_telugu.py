@@ -9,15 +9,17 @@ import wandb
 import random
 import numpy as np
 import argparse
-from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
-from trl import SFTTrainer
+from pathlib import Path
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM, 
     AutoTokenizer,
     TrainingArguments, 
-    EarlyStoppingCallback
+    EarlyStoppingCallback,
+    Trainer
 )
+from trl import SFTTrainer
+from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
 
 # Load configuration
 from config_loader import load_config
@@ -27,7 +29,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("finetune_unsloth.log"),
+        logging.FileHandler("finetune_full.log"),
         logging.StreamHandler()
     ]
 )
@@ -171,34 +173,51 @@ class TeluguFineTuner:
                 self.config["use_wandb"] = False
     
     def setup_model_and_tokenizer(self):
-        """Initialize model and tokenizer using HuggingFace's native approach for full fine-tuning"""
+        """Initialize model and tokenizer for true full supervised fine-tuning"""
         logger.info(f"Loading model and tokenizer from {self.config['model_name']}")
         
         try:
             # Step 1: Load the tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.config["model_name"],
-                trust_remote_code=True,
-                token=self.config.get("hf_token", None)
-            )
+            tokenizer_kwargs = {
+                "trust_remote_code": True,
+                "token": self.config.get("hf_token", None)
+            }
+            self.tokenizer = AutoTokenizer.from_pretrained(self.config["model_name"], **tokenizer_kwargs)
             
-            # Step 2: Load the model with BFloat16 for full fine-tuning
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.config["model_name"],
-                torch_dtype=torch.bfloat16,
-                trust_remote_code=True,
-                device_map="auto",
-                token=self.config.get("hf_token", None)
-            )
+            # Step 2: Load the model with proper settings for full fine-tuning
+            model_kwargs = {
+                "trust_remote_code": True,
+                "torch_dtype": torch.bfloat16,  # Use BFloat16 for training stability
+                "device_map": "auto",           # Let the model decide device mapping
+                "token": self.config.get("hf_token", None)
+            }
+            
+            logger.info("Loading model for full supervised fine-tuning (ALL parameters will be trainable)")
+            self.model = AutoModelForCausalLM.from_pretrained(self.config["model_name"], **model_kwargs)
             
             # Step 3: Enable gradient checkpointing for memory efficiency
-            self.model.gradient_checkpointing_enable()
+            if hasattr(self.model, "gradient_checkpointing_enable"):
+                self.model.gradient_checkpointing_enable()
+                logger.info("Gradient checkpointing enabled for memory efficiency")
             
-            # Step 4: Set up the chat template for Gemma-3
-            self.tokenizer = get_chat_template(
-                self.tokenizer,
-                chat_template="gemma-3"
-            )
+            # Step 4: Configure the model for training
+            if hasattr(self.model, "config"):
+                if hasattr(self.model.config, "use_cache"):
+                    self.model.config.use_cache = False
+                    logger.info("Model cache disabled for training")
+            
+            # Step 5: Ensure ALL parameters are trainable
+            for param in self.model.parameters():
+                param.requires_grad = True
+            
+            # Step 6: Set up the chat template
+            if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template is None:
+                # Apply Gemma-3 chat template
+                self.tokenizer = get_chat_template(
+                    self.tokenizer,
+                    chat_template="gemma-3"
+                )
+                logger.info("Applied Gemma-3 chat template")
             
             # Ensure padding token is set
             if self.tokenizer.pad_token is None:
@@ -212,13 +231,13 @@ class TeluguFineTuner:
             logger.info(f"Model loaded successfully with {total_params:.2f}B parameters")
             logger.info(f"Trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
             
-            if trainable_params / total_params < 0.9:
-                logger.info("Making all parameters trainable for full fine-tuning")
-                for param in self.model.parameters():
-                    param.requires_grad = True
-                
-                trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad) / 1e9
-                logger.info(f"Updated trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
+            # Verify full fine-tuning is enabled
+            if trainable_params / total_params > 0.99:
+                logger.info("TRUE FULL SUPERVISED FINE-TUNING SUCCESSFULLY ENABLED!")
+                logger.info(f"All {trainable_params:.2f}B parameters will be updated during training")
+            else:
+                logger.warning(f"Only {trainable_params:.2f}B/{total_params:.2f}B parameters are trainable")
+                logger.warning("This may not be true full supervised fine-tuning")
             
         except Exception as e:
             logger.error(f"Error loading model or tokenizer: {str(e)}")
@@ -264,6 +283,9 @@ class TeluguFineTuner:
                 ddp_find_unused_parameters=False,
             )
             
+            # Define training process for full supervised fine-tuning
+            logger.info("Initializing SFT trainer for full supervised fine-tuning")
+            
             # Initialize SFT trainer
             trainer = SFTTrainer(
                 model=self.model,
@@ -280,16 +302,21 @@ class TeluguFineTuner:
                 ] if eval_dataset else None,
             )
             
-            # Apply train-on-responses-only optimization
+            # Apply train-on-responses-only optimization if requested
             if self.config["train_on_responses_only"]:
-                trainer = train_on_responses_only(
-                    trainer,
-                    instruction_part="<start_of_turn>user\n",
-                    response_part="<start_of_turn>model\n",
-                )
+                try:
+                    logger.info("Applying train-on-responses-only optimization")
+                    trainer = train_on_responses_only(
+                        trainer,
+                        instruction_part="<start_of_turn>user\n",
+                        response_part="<start_of_turn>model\n",
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to apply train-on-responses-only: {e}")
+                    logger.warning("Proceeding with regular training")
             
             # Start training
-            logger.info("Starting training...")
+            logger.info("Starting full supervised fine-tuning...")
             trainer.train()
             
             # Save final model and tokenizer
@@ -308,7 +335,7 @@ class TeluguFineTuner:
                 logger.info(f"Pushing model to Hugging Face Hub as {self.config['hub_model_id']}")
                 trainer.push_to_hub()
             
-            logger.info("Training completed successfully!")
+            logger.info("Full supervised fine-tuning completed successfully!")
             
             # Close wandb
             if self.config["use_wandb"]:
@@ -319,7 +346,7 @@ class TeluguFineTuner:
             raise
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-tune Gemma-3 model for Telugu")
+    parser = argparse.ArgumentParser(description="Full Fine-tune Gemma-3 model for Telugu")
     parser.add_argument("--config", type=str, default="config.yaml", help="Path to configuration file")
     args = parser.parse_args()
     
