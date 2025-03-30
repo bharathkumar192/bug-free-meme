@@ -208,6 +208,16 @@ setup_huggingface() {
     else
       echo -e "${GREEN}HuggingFace token found in config.yaml${NC}"
     fi
+    
+    # Login to HuggingFace using token from config.yaml
+    HF_TOKEN=$(grep -oP 'hf_token:\s*"\K[^"]+' config.yaml)
+    if [ -n "$HF_TOKEN" ] && [ "$HF_TOKEN" != "null" ]; then
+      echo -e "${BLUE}Logging in to HuggingFace...${NC}"
+      echo "$HF_TOKEN" | huggingface-cli login
+      echo -e "${GREEN}Successfully logged in to HuggingFace${NC}"
+    else
+      echo -e "${YELLOW}No valid HuggingFace token found in config.yaml. Skipping login.${NC}"
+    fi
   else
     echo -e "${YELLOW}push_to_hub not enabled in config.yaml${NC}"
   fi
