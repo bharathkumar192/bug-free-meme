@@ -86,21 +86,29 @@ class TeluguDataProcessor:
             dataset = Dataset.from_list(processed_data)
             logger.info(f"Processed {len(dataset)} valid examples")
             
+            # Standardize the format first (this helps with compatibility)
+            dataset = standardize_data_formats(dataset)
+            
             if self.config["eval_split"] > 0:
                 split = dataset.train_test_split(test_size=self.config["eval_split"], seed=self.config["seed"])
                 train_dataset, eval_dataset = split["train"], split["test"]
             else:
                 train_dataset, eval_dataset = dataset, None
             
-            # Apply chat template in a single mapping operation
+            # Apply chat template in a single mapping operation - ensuring string outputs
+            def apply_template(examples):
+                result = {"text": [self.tokenizer.apply_chat_template(conv) for conv in examples["conversations"]]}
+                # Ensure all values are strings to avoid 'int' has no attribute 'startswith' error
+                return result
+            
             train_dataset = train_dataset.map(
-                lambda x: {"text": self.tokenizer.apply_chat_template(x["conversations"])}, 
+                apply_template, 
                 batched=True
             )
             
             if eval_dataset:
                 eval_dataset = eval_dataset.map(
-                    lambda x: {"text": self.tokenizer.apply_chat_template(x["conversations"])}, 
+                    apply_template, 
                     batched=True
                 )
                 logger.info(f"Train/eval datasets: {len(train_dataset)}/{len(eval_dataset)} examples")
