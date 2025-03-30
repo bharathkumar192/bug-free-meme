@@ -57,7 +57,8 @@ model:
 training:
   bf16: true
   bnb_4bit_compute_dtype: bfloat16
-  deepspeed: ds_config_zero3.json
+  # deepspeed: ds_config_zero3.json
+  deepspeed: False
   early_stopping_patience: 3
   fp16: false
   gradient_accumulation_steps: 32

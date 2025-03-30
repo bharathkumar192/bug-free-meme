@@ -38,7 +38,8 @@ class TrainingConfig:
     fp16: bool = False
     bf16: bool = True
     gradient_checkpointing: bool = True
-    deepspeed: str = "ds_config_zero3.json"
+    # deepspeed: str = "ds_config_zero3.json"
+    deepspeed: str = None
     
     # PEFT/LoRA settings
     use_peft: bool = False  # Enabled PEFT for memory efficiency
