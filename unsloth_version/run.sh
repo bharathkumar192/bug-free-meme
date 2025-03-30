@@ -53,7 +53,7 @@ install_dependencies() {
   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
   pip install transformers datasets accelerate wandb tensorboard peft
   pip install bitsandbytes safetensors pandas pyyaml tqdm huggingface-hub
-  pip install unsloth
+  pip install unsloth deepspeed
   
   # Install latest Hugging Face for Gemma-3
   pip install --no-deps git+https://github.com/huggingface/transformers@v4.49.0-Gemma-3
