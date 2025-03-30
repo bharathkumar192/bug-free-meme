@@ -121,6 +121,29 @@ class TeluguDataProcessor:
             logger.error(f"Error processing dataset: {str(e)}")
             raise
 
+
+def tokenize_dataset(dataset, tokenizer, max_length):
+    def tokenize_function(examples):
+        # Your dataset has 'text' column with the chat-templated conversations
+        inputs = tokenizer(
+            examples["text"],
+            padding="max_length",
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt"
+        )
+        # Set the labels to be the same as input_ids for causal language modeling
+        inputs["labels"] = inputs["input_ids"].copy()
+        return inputs
+    
+    # Apply tokenization to the dataset
+    tokenized_dataset = dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=["conversations", "text"]  # Remove original columns
+    )
+    return tokenized_dataset
+
 class TeluguFineTuner:
     def __init__(self, config):
         """Initialize the fine-tuner with configuration"""
@@ -246,7 +269,6 @@ class TeluguFineTuner:
                 save_steps=self.config["save_steps"],
                 eval_steps=self.config["eval_steps"] if eval_dataset else None,
                 save_total_limit=self.config["save_total_limit"],
-                # Change evaluation_strategy to eval_strategy
                 eval_strategy="steps" if eval_dataset else "no",
                 save_strategy="steps",
                 load_best_model_at_end=True if eval_dataset else False,
@@ -261,6 +283,7 @@ class TeluguFineTuner:
                 seed=self.config["seed"],
                 group_by_length=True,
                 ddp_find_unused_parameters=False,
+                remove_unused_columns=False,
             )
             
             # Define training process for full supervised fine-tuning
@@ -281,6 +304,12 @@ class TeluguFineTuner:
             #         )
             #     ] if eval_dataset else None,
             # )
+
+
+            train_dataset = tokenize_dataset(train_dataset, self.tokenizer, self.config["max_seq_length"])
+            if eval_dataset:
+                eval_dataset = tokenize_dataset(eval_dataset, self.tokenizer, self.config["max_seq_length"])
+
 
             trainer = Trainer(
                 model=self.model,
