@@ -19,7 +19,9 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments, 
     EarlyStoppingCallback,
-    Trainer
+    Trainer,
+    AutoProcessor, 
+    Gemma3ForConditionalGeneration
 )
 
 # Load configuration
@@ -175,6 +177,7 @@ class TeluguFineTuner:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             
             # Load model
+            # self.model = Gemma3ForConditionalGeneration.from_pretrained(
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.config["model_name"],
                 device_map="auto",
@@ -219,6 +222,7 @@ class TeluguFineTuner:
             logger.info("Using Unsloth for faster training")
             
             # Configure training arguments
+            # Configure training arguments
             training_args = TrainingArguments(
                 output_dir=self.config["output_dir"],
                 num_train_epochs=self.config["num_train_epochs"],
@@ -234,7 +238,8 @@ class TeluguFineTuner:
                 save_steps=self.config["save_steps"],
                 eval_steps=self.config["eval_steps"] if eval_dataset else None,
                 save_total_limit=self.config["save_total_limit"],
-                evaluation_strategy="steps" if eval_dataset else "no",
+                # Change evaluation_strategy to eval_strategy
+                eval_strategy="steps" if eval_dataset else "no",
                 save_strategy="steps",
                 load_best_model_at_end=True if eval_dataset else False,
                 report_to="wandb" if self.config["use_wandb"] else "none",
