@@ -321,7 +321,13 @@ main() {
   create_directories
   # create_run_script
   # create_tmux_script
-  
+  apt-get update && apt-get install -y git-lfs
+  git lfs install
+  git lfs pull
+
+
+
+
   echo -e "${BLUE}=========================================================${NC}"
   echo -e "${GREEN}Setup completed successfully!${NC}"
   echo -e "${BLUE}To start training, you have two options:${NC}"
