@@ -200,7 +200,8 @@ class TeluguFineTuner:
                 max_seq_length=self.config["max_seq_length"],
                 dtype=torch.bfloat16,  # Use BFloat16 for training stability
                 token=self.config.get("hf_token", None),
-                full_finetuning=True
+                full_finetuning=True,
+                logit_softcapping=1.0
             )
             
             # Step 3: Configure for full fine-tuning using a minimal LoRA rank (8 is a good value)
