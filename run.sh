@@ -319,8 +319,8 @@ main() {
   
   echo -e "${BLUE}Creating directories and scripts...${NC}"
   create_directories
-  create_run_script
-  create_tmux_script
+  # create_run_script
+  # create_tmux_script
   
   echo -e "${BLUE}=========================================================${NC}"
   echo -e "${GREEN}Setup completed successfully!${NC}"
