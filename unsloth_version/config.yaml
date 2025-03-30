@@ -1,0 +1,41 @@
+# Model and dataset settings
+model_name: "google/gemma-3-12b-pt"
+input_file: "telugu_results.json"
+output_dir: "finetuned_gemma3_telugu"
+max_seq_length: 2048
+
+# Training settings for full parameter fine-tuning
+num_train_epochs: 3
+per_device_train_batch_size: 1  # For 80GB GPUs, can use higher values (adjust based on OOM errors)
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16  # Adjust based on GPU memory
+learning_rate: 1e-5  # Typical for full fine-tuning
+weight_decay: 0.01
+max_grad_norm: 1.0
+warmup_ratio: 0.05
+lr_scheduler_type: "cosine"
+optimizer: "adamw_torch"
+
+# Evaluation settings
+eval_split: 0.05  # 5% for evaluation
+early_stopping_patience: 3
+
+# Logging and saving settings
+logging_steps: 10
+save_steps: 100
+eval_steps: 100
+save_total_limit: 3
+
+# Integration settings
+use_wandb: true
+wandb_api_key: "bc746fafa585f61730cdfd3c8226492c777f875a"  # Replace with your key
+wandb_project: "telugu-gemma-sft"
+wandb_entity: null
+push_to_hub: true
+hub_model_id: "bharathkumar1922001/gemma-3-12b-telugu"  # Replace with your username
+hf_token: "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"  # Replace with your token
+
+# Additional settings
+train_on_responses_only: true
+seed: 42
+run_name: "full-finetune"
