@@ -99,6 +99,8 @@ class TeluguDataProcessor:
             def apply_template(examples):
                 result = {"text": [self.tokenizer.apply_chat_template(conv) for conv in examples["conversations"]]}
                 # Ensure all values are strings to avoid 'int' has no attribute 'startswith' error
+                if type(result["text"]) != str:
+                    print("found it")
                 return result
             
             train_dataset = train_dataset.map(

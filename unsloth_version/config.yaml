@@ -36,6 +36,6 @@ hub_model_id: "bharathkumar1922001/gemma-3-12b-telugu"  # Replace with your user
 hf_token: "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"  # Replace with your token
 
 # Additional settings
-train_on_responses_only: true
+train_on_responses_only: false
 seed: 42
 run_name: "full-finetune"
