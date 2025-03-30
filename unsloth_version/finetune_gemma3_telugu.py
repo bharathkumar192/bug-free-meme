@@ -167,21 +167,28 @@ class TeluguFineTuner:
                 logger.warning(f"Failed to initialize Weights & Biases: {e}")
                 self.config["use_wandb"] = False
     
+
     def setup_model_and_tokenizer(self):
         """Initialize model and tokenizer using Unsloth"""
         logger.info(f"Loading model and tokenizer from {self.config['model_name']}")
         
         try:
-            # For full parameter fine-tuning, we set use_peft=False
+            # For full parameter fine-tuning with Unsloth
             self.model, self.tokenizer = FastModel.from_pretrained(
                 model_name=self.config["model_name"],
                 max_seq_length=self.config["max_seq_length"],
                 dtype=torch.bfloat16,  # Using bfloat16 for stability
                 load_in_4bit=False,  # Not using 4-bit quantization for full fine-tuning
                 load_in_8bit=False,  # Not using 8-bit quantization for full fine-tuning
-                # For full parameter fine-tuning:
-                use_peft=False,
-                full_finetune=True,  # Enable full fine-tuning
+                
+                # IMPORTANT: These parameters need to be set correctly for full fine-tuning
+                fast_tokenizer=True,
+                # The key parameters for full fine-tuning:
+                full_finetune=True,     # Enable full fine-tuning
+                # use_peft=False,         # Disable PEFT (LoRA)
+                upcast_layernorm=True,  # For stability in full fine-tuning
+                flash_attention_2=True,  # Performance optimization
+                
                 # HF token for gated model access
                 token=self.config.get("hf_token", None)
             )
@@ -203,6 +210,12 @@ class TeluguFineTuner:
             
             logger.info(f"Model loaded successfully with {total_params:.2f}B parameters")
             logger.info(f"Trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
+            
+            # Verify that full fine-tuning is enabled
+            if trainable_params / total_params > 0.9:  # If >90% of parameters are trainable
+                logger.info("Full fine-tuning successfully enabled!")
+            else:
+                logger.warning("Full fine-tuning may not be properly enabled. Check configuration.")
             
         except Exception as e:
             logger.error(f"Error loading model or tokenizer: {str(e)}")
