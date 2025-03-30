@@ -261,7 +261,7 @@ class TeluguFineTuner:
                 seed=self.config["seed"],
                 group_by_length=True,
                 ddp_find_unused_parameters=False,
-                data_parallel_backend=None,
+                # data_parallel_backend=None,
                 # deepspeed="ds_config.json",
                 local_rank=-1
             )
