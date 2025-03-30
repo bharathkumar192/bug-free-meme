@@ -14,8 +14,8 @@ class TeluguFineTuningConfig:
     
     # Training settings
     num_train_epochs: int = 3
-    per_device_train_batch_size: int = 4
-    per_device_eval_batch_size: int = 1
+    per_device_train_batch_size: int = 16
+    per_device_eval_batch_size: int = 2
     gradient_accumulation_steps: int = 16
     data_sample_ratio: float = 0.13
     learning_rate: float = 1e-5
