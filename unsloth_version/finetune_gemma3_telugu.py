@@ -20,6 +20,7 @@ from transformers import (
 )
 from trl import SFTTrainer
 from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
+from unsloth import FastLanguageModel  # Add this import
 
 # Load configuration
 from config_loader import load_config
@@ -173,8 +174,8 @@ class TeluguFineTuner:
                 self.config["use_wandb"] = False
     
     def setup_model_and_tokenizer(self):
-        """Initialize model and tokenizer for true full supervised fine-tuning"""
-        logger.info(f"Loading model and tokenizer from {self.config['model_name']}")
+        """Initialize model and tokenizer with Unsloth for better compatibility and performance"""
+        logger.info(f"Loading model and tokenizer from {self.config['model_name']} using Unsloth")
         
         try:
             # Step 1: Load the tokenizer
@@ -184,33 +185,39 @@ class TeluguFineTuner:
             }
             self.tokenizer = AutoTokenizer.from_pretrained(self.config["model_name"], **tokenizer_kwargs)
             
-            # Step 2: Load the model with proper settings for full fine-tuning
-            model_kwargs = {
-                "trust_remote_code": True,
-                "torch_dtype": torch.bfloat16,  # Use BFloat16 for training stability
-                "device_map": "auto",           # Let the model decide device mapping
-                "token": self.config.get("hf_token", None)
-            }
+            # Ensure padding token is set
+            if self.tokenizer.pad_token is None:
+                logger.info("Setting pad_token to eos_token")
+                self.tokenizer.pad_token = self.tokenizer.eos_token
             
-            logger.info("Loading model for full supervised fine-tuning (ALL parameters will be trainable)")
-            self.model = AutoModelForCausalLM.from_pretrained(self.config["model_name"], **model_kwargs)
+            # Step 2: Load the model with Unsloth for faster training
+            logger.info("Loading model with Unsloth for faster supervised fine-tuning")
             
-            # Step 3: Enable gradient checkpointing for memory efficiency
-            if hasattr(self.model, "gradient_checkpointing_enable"):
-                self.model.gradient_checkpointing_enable()
-                logger.info("Gradient checkpointing enabled for memory efficiency")
+            # Load model and prepare it for full parameter fine-tuning
+            self.model, self.tokenizer = FastLanguageModel.from_pretrained(
+                model_name=self.config["model_name"],
+                max_seq_length=self.config["max_seq_length"],
+                dtype=torch.bfloat16,  # Use BFloat16 for training stability
+                load_in_4bit=False,    # For full parameter fine-tuning, don't use 4-bit
+                token=self.config.get("hf_token", None),
+            )
             
-            # Step 4: Configure the model for training
-            if hasattr(self.model, "config"):
-                if hasattr(self.model.config, "use_cache"):
-                    self.model.config.use_cache = False
-                    logger.info("Model cache disabled for training")
+            # Step 3: Configure the model for full parameter training
+            logger.info("Configuring model for full parameter fine-tuning")
+            self.model = FastLanguageModel.get_peft_model(
+                self.model,
+                r=0,  # No LoRA rank (full fine-tuning)
+                target_modules=["all"],  # Target all modules
+                lora_alpha=0,  # Not using LoRA
+                lora_dropout=0,  # Not using LoRA
+                bias="none",  # No bias
+                use_gradient_checkpointing=True,  # Enable gradient checkpointing
+                random_state=self.config["seed"],  # For reproducibility
+                use_rslora=False,  # Not using rank-stabilized LoRA
+                loftq_config=None,  # Not using LoftQ
+            )
             
-            # Step 5: Ensure ALL parameters are trainable
-            for param in self.model.parameters():
-                param.requires_grad = True
-            
-            # Step 6: Set up the chat template
+            # Step 4: Set up the chat template
             if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template is None:
                 # Apply Gemma-3 chat template
                 self.tokenizer = get_chat_template(
@@ -218,11 +225,6 @@ class TeluguFineTuner:
                     chat_template="gemma-3"
                 )
                 logger.info("Applied Gemma-3 chat template")
-            
-            # Ensure padding token is set
-            if self.tokenizer.pad_token is None:
-                logger.info("Setting pad_token to eos_token")
-                self.tokenizer.pad_token = self.tokenizer.eos_token
             
             # Calculate parameters
             total_params = sum(p.numel() for p in self.model.parameters()) / 1e9
@@ -233,14 +235,14 @@ class TeluguFineTuner:
             
             # Verify full fine-tuning is enabled
             if trainable_params / total_params > 0.99:
-                logger.info("TRUE FULL SUPERVISED FINE-TUNING SUCCESSFULLY ENABLED!")
+                logger.info("TRUE FULL SUPERVISED FINE-TUNING SUCCESSFULLY ENABLED WITH UNSLOTH!")
                 logger.info(f"All {trainable_params:.2f}B parameters will be updated during training")
             else:
                 logger.warning(f"Only {trainable_params:.2f}B/{total_params:.2f}B parameters are trainable")
                 logger.warning("This may not be true full supervised fine-tuning")
             
         except Exception as e:
-            logger.error(f"Error loading model or tokenizer: {str(e)}")
+            logger.error(f"Error loading model or tokenizer with Unsloth: {str(e)}")
             raise
             
     def train(self):
@@ -250,6 +252,9 @@ class TeluguFineTuner:
         try:
             # Load and process the data
             train_dataset, eval_dataset = self.data_processor.load_and_process_data()
+            
+            # Add unsloth performance info
+            logger.info("Using Unsloth for faster training")
             
             # Configure training arguments
             training_args = TrainingArguments(
