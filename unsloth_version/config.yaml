@@ -5,9 +5,9 @@ output_dir: "finetuned_gemma3_telugu"
 max_seq_length: 2048
 
 # Training settings for full parameter fine-tuning
-num_train_epochs: 3
+num_train_epochs: 5
 data_sample_ratio: 0.5
-per_device_train_batch_size: 2  # For 80GB GPUs, can use higher values (adjust based on OOM errors)
+per_device_train_batch_size: 4 # For 80GB GPUs, can use higher values (adjust based on OOM errors)
 per_device_eval_batch_size: 1
 gradient_accumulation_steps: 32  # Adjust based on GPU memory
 learning_rate: 0.00001  # Instead of 1e-5
