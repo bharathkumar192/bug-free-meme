@@ -191,7 +191,7 @@ class TeluguFineTuner:
             # Load model
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.config["model_name"],
-                # device_map="auto",
+                device_map="auto",
                 device_map=None,
                 torch_dtype=torch.bfloat16,
                 trust_remote_code=True,
@@ -251,8 +251,8 @@ class TeluguFineTuner:
                 save_strategy="steps",
                 load_best_model_at_end=True if eval_dataset else False,
                 report_to="wandb" if self.config["use_wandb"] else "none",
-                fp16=False,
-                bf16=True,  # Use bfloat16 precision
+                fp16=True,
+                bf16=False,  # Use bfloat16 precision
                 gradient_checkpointing=True,  # Enable gradient checkpointing for memory efficiency
                 optim=self.config["optimizer"],
                 push_to_hub=self.config["push_to_hub"],
@@ -261,7 +261,9 @@ class TeluguFineTuner:
                 seed=self.config["seed"],
                 group_by_length=True,
                 ddp_find_unused_parameters=False,
+                data_parallel_backend=None,
                 # deepspeed="ds_config.json",
+                local_rank=-1
             )
             
             # Define training process for full supervised fine-tuning
