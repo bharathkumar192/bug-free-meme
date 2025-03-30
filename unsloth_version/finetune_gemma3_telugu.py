@@ -52,7 +52,7 @@ class TeluguDataProcessor:
         self.tokenizer = tokenizer
     
     def load_and_process_data(self):
-        """Load and process the Telugu dataset directly for training"""
+        """Load and process the Telugu dataset with a simple approach"""
         logger.info(f"Loading dataset from {self.config['input_file']}")
         
         try:
@@ -65,7 +65,7 @@ class TeluguDataProcessor:
             
             logger.info(f"Loaded {len(questions)} examples from dataset")
             
-            # Process data directly into input_ids and labels
+            # Process data in a simple format
             processed_data = []
             
             for item in questions:
@@ -73,43 +73,40 @@ class TeluguDataProcessor:
                 response = item.get('response', '').strip()
                 
                 if question and response:
-                    # Create conversation format
-                    conversation = [
-                        {"role": "user", "content": question},
-                        {"role": "assistant", "content": response}
-                    ]
+                    # Create a simple prompt-response format
+                    text = f"Question: {question}\nAnswer: {response}"
                     
-                    # Apply chat template to get formatted text
-                    formatted_text = self.tokenizer.apply_chat_template(conversation)
-                    
-                    # Tokenize the text
-                    inputs = self.tokenizer(
-                        formatted_text,
-                        padding="max_length",
-                        truncation=True,
-                        max_length=self.config["max_seq_length"],
-                        return_tensors="pt"
-                    )
-                    
-                    # Add to processed data with input_ids and attention_mask
-                    processed_item = {
-                        "input_ids": inputs.input_ids[0].tolist(),
-                        "attention_mask": inputs.attention_mask[0].tolist(),
-                        # Labels are same as input_ids for causal LM
-                        "labels": inputs.input_ids[0].tolist()
-                    }
+                    # Add to processed data
+                    processed_item = {"text": text}
                     processed_data.append(processed_item)
             
             # Create dataset and split
             dataset = Dataset.from_list(processed_data)
-            logger.info(f"Processed {len(dataset)} valid examples with tokenization")
+            logger.info(f"Processed {len(dataset)} valid examples")
+            
+            # Tokenize the dataset
+            def tokenize_function(examples):
+                return self.tokenizer(
+                    examples["text"],
+                    padding="max_length",
+                    truncation=True,
+                    max_length=self.config["max_seq_length"],
+                    return_tensors="pt"
+                )
+            
+            tokenized_dataset = dataset.map(
+                tokenize_function, 
+                batched=True,
+                remove_columns=["text"]
+            )
+            logger.info(f"Tokenized dataset successfully")
             
             if self.config["eval_split"] > 0:
-                split = dataset.train_test_split(test_size=self.config["eval_split"], seed=self.config["seed"])
+                split = tokenized_dataset.train_test_split(test_size=self.config["eval_split"], seed=self.config["seed"])
                 train_dataset, eval_dataset = split["train"], split["test"]
                 logger.info(f"Train/eval datasets: {len(train_dataset)}/{len(eval_dataset)} examples")
             else:
-                train_dataset, eval_dataset = dataset, None
+                train_dataset, eval_dataset = tokenized_dataset, None
                 logger.info(f"Training dataset: {len(train_dataset)} examples")
             
             return train_dataset, eval_dataset
