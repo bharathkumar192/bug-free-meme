@@ -11,7 +11,7 @@ class DataConfig:
     output_dir: str = "processed_data"
     min_length: int = 50
     max_length: int = 2048
-    data_percentage: float = 0.6  # Use 60% of data
+    data_percentage: float = 0.3  # Use 60% of data
     train_ratio: float = 0.9
     val_ratio: float = 0.05
     test_ratio: float = 0.05
