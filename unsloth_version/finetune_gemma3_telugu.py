@@ -87,7 +87,7 @@ class TeluguDataProcessor:
             logger.info(f"Processed {len(dataset)} valid examples")
             
             # Standardize the format first (this helps with compatibility)
-            dataset = standardize_data_formats(dataset)
+            # dataset = standardize_data_formats(dataset)
             
             if self.config["eval_split"] > 0:
                 split = dataset.train_test_split(test_size=self.config["eval_split"], seed=self.config["seed"])
