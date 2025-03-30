@@ -200,23 +200,22 @@ class TeluguFineTuner:
                 max_seq_length=self.config["max_seq_length"],
                 dtype=torch.bfloat16,  # Use BFloat16 for training stability
                 token=self.config.get("hf_token", None),
+                full_finetuning=True
             )
             
             # Step 3: Configure for full fine-tuning using a minimal LoRA rank (8 is a good value)
             # but setting all parameters as trainable
             logger.info("Configuring model for full parameter fine-tuning via max-trainable LoRA")
-            self.model = FastLanguageModel.get_peft_model(
-                self.model,
-                r=8,  # Minimum viable LoRA rank (Unsloth requires r > 0)
-                target_modules=["all"],  # Target all modules
-                lora_alpha=16,  # Standard alpha value
-                lora_dropout=0,  # No dropout for full fine-tuning
-                bias="none",  # No bias
-                use_gradient_checkpointing=True,  # Enable gradient checkpointing
-                random_state=self.config["seed"],  # For reproducibility
-                use_rslora=False,  # Not using rank-stabilized LoRA
-                modules_to_save=["all"],  # This makes it equivalent to full fine-tuning
-            )
+            # self.model = FastLanguageModel.get_peft_model(
+            #     self.model,
+            #     lora_alpha=16,  # Standard alpha value
+            #     lora_dropout=0,  # No dropout for full fine-tuning
+            #     bias="none",  # No bias
+            #     use_gradient_checkpointing=True,  # Enable gradient checkpointing
+            #     random_state=self.config["seed"],  # For reproducibility
+            #     use_rslora=False,  # Not using rank-stabilized LoRA
+            #     modules_to_save=["all"],  # This makes it equivalent to full fine-tuning
+            # )
             
             # Step 4: Set up the chat template
             if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template is None:
