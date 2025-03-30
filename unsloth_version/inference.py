@@ -7,9 +7,10 @@ import json
 import argparse
 import logging
 from pathlib import Path
-from transformers import AutoTokenizer
 from unsloth import FastModel
 from unsloth.chat_templates import get_chat_template
+from transformers import AutoTokenizer
+
 
 # Configure logging
 logging.basicConfig(
