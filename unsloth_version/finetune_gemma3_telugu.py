@@ -10,11 +10,15 @@ import random
 import numpy as np
 import argparse
 from pathlib import Path
-from unsloth import FastModel
-from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
 from datasets import Dataset
-from transformers import TrainingArguments, EarlyStoppingCallback
+from transformers import (
+    AutoModelForCausalLM, 
+    AutoTokenizer,
+    TrainingArguments, 
+    EarlyStoppingCallback
+)
 from trl import SFTTrainer
+from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
 
 # Load configuration
 from config_loader import load_config
@@ -167,33 +171,31 @@ class TeluguFineTuner:
                 logger.warning(f"Failed to initialize Weights & Biases: {e}")
                 self.config["use_wandb"] = False
     
-
     def setup_model_and_tokenizer(self):
-        """Initialize model and tokenizer using Unsloth"""
+        """Initialize model and tokenizer using HuggingFace's native approach for full fine-tuning"""
         logger.info(f"Loading model and tokenizer from {self.config['model_name']}")
         
         try:
-            # For full parameter fine-tuning with Unsloth
-            self.model, self.tokenizer = FastModel.from_pretrained(
-                model_name=self.config["model_name"],
-                max_seq_length=self.config["max_seq_length"],
-                dtype=torch.bfloat16,  # Using bfloat16 for stability
-                load_in_4bit=False,  # Not using 4-bit quantization for full fine-tuning
-                load_in_8bit=False,  # Not using 8-bit quantization for full fine-tuning
-                
-                # IMPORTANT: These parameters need to be set correctly for full fine-tuning
-                # fast_tokenizer=True,
-                # The key parameters for full fine-tuning:
-                full_finetune=True,     # Enable full fine-tuning
-                # use_peft=False,         # Disable PEFT (LoRA)
-                upcast_layernorm=True,  # For stability in full fine-tuning
-                flash_attention_2=True,  # Performance optimization
-                
-                # HF token for gated model access
+            # Step 1: Load the tokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.config["model_name"],
+                trust_remote_code=True,
                 token=self.config.get("hf_token", None)
             )
             
-            # Set up the chat template for Gemma-3
+            # Step 2: Load the model with BFloat16 for full fine-tuning
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.config["model_name"],
+                torch_dtype=torch.bfloat16,
+                trust_remote_code=True,
+                device_map="auto",
+                token=self.config.get("hf_token", None)
+            )
+            
+            # Step 3: Enable gradient checkpointing for memory efficiency
+            self.model.gradient_checkpointing_enable()
+            
+            # Step 4: Set up the chat template for Gemma-3
             self.tokenizer = get_chat_template(
                 self.tokenizer,
                 chat_template="gemma-3"
@@ -211,11 +213,13 @@ class TeluguFineTuner:
             logger.info(f"Model loaded successfully with {total_params:.2f}B parameters")
             logger.info(f"Trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
             
-            # Verify that full fine-tuning is enabled
-            if trainable_params / total_params > 0.9:  # If >90% of parameters are trainable
-                logger.info("Full fine-tuning successfully enabled!")
-            else:
-                logger.warning("Full fine-tuning may not be properly enabled. Check configuration.")
+            if trainable_params / total_params < 0.9:
+                logger.info("Making all parameters trainable for full fine-tuning")
+                for param in self.model.parameters():
+                    param.requires_grad = True
+                
+                trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad) / 1e9
+                logger.info(f"Updated trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
             
         except Exception as e:
             logger.error(f"Error loading model or tokenizer: {str(e)}")
