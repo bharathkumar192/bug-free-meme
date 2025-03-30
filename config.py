@@ -1,97 +1,82 @@
 import os
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
-import json
+from typing import List, Optional
 import yaml
+import json
+from pathlib import Path
 
 @dataclass
 class DataConfig:
-    """Configuration for dataset preparation and processing"""
-    input_file: str = "telugu_results.json"  # Path to raw dataset
-    output_dir: str = "processed_data"  # Directory for processed data
-    min_length: int = 50  # Minimum text length for validation
-    max_length: int = 2048  # Maximum text length for validation
-    train_ratio: float = 0.9  # Ratio for training split
-    val_ratio: float = 0.05  # Ratio for validation split
-    test_ratio: float = 0.05  # Ratio for test split
+    input_file: str = "telugu_results.json"
+    output_dir: str = "processed_data"
+    min_length: int = 50
+    max_length: int = 2048
+    data_percentage: float = 0.6  # Use 60% of data
+    train_ratio: float = 0.9
+    val_ratio: float = 0.05
+    test_ratio: float = 0.05
 
 @dataclass
 class ModelConfig:
-    """Configuration for model selection and parameters"""
-    model_name: str = "google/gemma-3-12b-pt"  # Base model to fine-tune
-    use_chat_template: bool = True  # Whether to use chat formatting
-    chat_template: Optional[str] = None  # Custom chat template (if specified)
+    model_name: str = "google/gemma-3-12b-pt"
+    use_chat_template: bool = True
+    chat_template: str = "{% for message in messages %}\n{% if message['role'] == 'user' %}\n<start_of_turn>user\n{{ message['content'] }}\n<end_of_turn>\n{% elif message['role'] == 'assistant' %}\n<start_of_turn>model\n{{ message['content'] }}\n<end_of_turn>\n{% endif %}\n{% endfor %}\n{% if add_generation_prompt %}\n<start_of_turn>model\n{% endif %}"
 
 @dataclass
 class TrainingConfig:
-    """Configuration for training parameters"""
-    num_train_epochs: int = 3  # Number of training epochs
-    per_device_train_batch_size: int = 2  # Batch size for training
-    per_device_eval_batch_size: int = 2  # Batch size for evaluation
-    gradient_accumulation_steps: int = 16  # Steps for gradient accumulation
-    learning_rate: float = 2e-6  # Training learning rate
-    weight_decay: float = 0.01  # Weight decay for regularization
-    max_grad_norm: float = 1.0  # Maximum gradient norm for clipping
+    num_train_epochs: int = 3
+    per_device_train_batch_size: int = 2
+    per_device_eval_batch_size: int = 2
+    gradient_accumulation_steps: int = 32
+    learning_rate: float = 2e-6
+    weight_decay: float = 0.01
+    warmup_ratio: float = 0.05
+    lr_scheduler_type: str = "cosine"
+    max_seq_length: int = 2048
     
-    # Scheduler settings
-    warmup_ratio: float = 0.05  # Ratio of warmup steps
-    lr_scheduler_type: str = "cosine"  # Learning rate scheduler type
+    # Memory optimization
+    fp16: bool = False
+    bf16: bool = True
+    gradient_checkpointing: bool = True
+    deepspeed: str = "ds_config_zero3.json"
     
-    # Sequence length
-    max_seq_length: int = 2048  # Maximum sequence length for tokenization
+    # PEFT/LoRA settings
+    use_peft: bool = False  # Enabled PEFT for memory efficiency
+    lora_r: int = 16
+    lora_alpha: int = 32
+    lora_dropout: float = 0.05
     
-    # Optimization settings
-    fp16: bool = True  # Use FP16 precision
-    bf16: bool = False  # Use BF16 precision (A100, H100 GPUs)
-    gradient_checkpointing: bool = True  # Use gradient checkpointing
+    # Quantization
+    use_4bit: bool = False
+    bnb_4bit_compute_dtype: str = "bfloat16"
     
-    # Early stopping
-    early_stopping_patience: int = 3  # Patience for early stopping
-    
-    # DeepSpeed integration
-    use_deepspeed: bool = False  # Whether to use DeepSpeed
-    deepspeed_config_path: Optional[str] = None  # Path to DeepSpeed config
-    
-    # PEFT/LoRA parameters (for parameter-efficient fine-tuning)
-    use_peft: bool = False  # Whether to use PEFT
-    lora_r: int = 16  # LoRA rank
-    lora_alpha: int = 32  # LoRA alpha
-    lora_dropout: float = 0.05  # LoRA dropout
-    
-    # Quantization settings
-    use_4bit: bool = False  # Use 4-bit quantization
-    bnb_4bit_compute_dtype: str = "float16"  # Compute dtype for 4-bit quantization
+    # Additional
+    early_stopping_patience: int = 3
+    max_grad_norm: float = 1.0
 
 @dataclass
 class LoggingConfig:
-    """Configuration for logging and checkpointing"""
-    output_dir: str = "finetuned_model"  # Directory for model output
-    logging_steps: int = 10  # Steps between logging
-    save_steps: int = 100  # Steps between saving checkpoints
-    eval_steps: int = 100  # Steps between evaluations
-    save_total_limit: int = 5  # Maximum number of checkpoints to keep
-    report_to: List[str] = field(default_factory=lambda: ["wandb", "tensorboard"])  # Tracking platforms
+    output_dir: str = "finetuned_model"
+    logging_steps: int = 50
+    save_steps: int = 500
+    eval_steps: int = 250
+    save_total_limit: int = 5
+    report_to: List[str] = field(default_factory=lambda: ["wandb", "tensorboard"])
 
 @dataclass
 class IntegrationConfig:
-    """Configuration for third-party integrations"""
-    # Weights & Biases
-    wandb_api_key: Optional[str] = None  # Weights & Biases API key
-    wandb_project: str = "telugu-gemma-sft"  # W&B project name
-    wandb_entity: Optional[str] = None  # W&B entity/organization
+    wandb_api_key: str = "bc746fafa585f61730cdfd3c8226492c777f875a"  # Replace with your key
+    wandb_project: str = "telugu-gemma-sft"
+    wandb_entity: Optional[str] = None
     
-    # HuggingFace Hub
-    hf_token: Optional[str] = None  # HuggingFace API token
-    push_to_hub: bool = False  # Whether to push to HuggingFace Hub
-    hub_model_id: Optional[str] = None  # HF Hub model ID (username/model-name)
+    hf_token: str = "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"  # Replace with your token
+    push_to_hub: bool = True
+    hub_model_id: Optional[str] = None
     
-    # Seeds
-    seed: int = 42  # Random seed for reproducibility
+    seed: int = 42
 
 @dataclass
 class UnifiedConfig:
-    """Unified configuration for the entire fine-tuning pipeline"""
     data: DataConfig = field(default_factory=DataConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
@@ -100,57 +85,41 @@ class UnifiedConfig:
     
     @classmethod
     def from_file(cls, config_path: str) -> "UnifiedConfig":
-        """Load configuration from file (YAML or JSON)"""
+        """Load configuration from file"""
         config_path = Path(config_path)
         
         if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+            raise FileNotFoundError(f"Config file not found: {config_path}")
         
-        if config_path.suffix.lower() == ".yaml" or config_path.suffix.lower() == ".yml":
+        # Load the file based on extension
+        if config_path.suffix.lower() in [".yaml", ".yml"]:
             with open(config_path, "r") as f:
                 config_dict = yaml.safe_load(f)
         elif config_path.suffix.lower() == ".json":
             with open(config_path, "r") as f:
                 config_dict = json.load(f)
         else:
-            raise ValueError(f"Unsupported configuration format: {config_path.suffix}")
+            raise ValueError(f"Unsupported config format: {config_path.suffix}")
         
-        # Create configuration instance with defaults
+        # Create config with defaults
         config = cls()
         
-        # Update with values from file
-        if "data" in config_dict:
-            for k, v in config_dict["data"].items():
-                if hasattr(config.data, k):
-                    setattr(config.data, k, v)
-        
-        if "model" in config_dict:
-            for k, v in config_dict["model"].items():
-                if hasattr(config.model, k):
-                    setattr(config.model, k, v)
-        
-        if "training" in config_dict:
-            for k, v in config_dict["training"].items():
-                if hasattr(config.training, k):
-                    setattr(config.training, k, v)
-        
-        if "logging" in config_dict:
-            for k, v in config_dict["logging"].items():
-                if hasattr(config.logging, k):
-                    setattr(config.logging, k, v)
-        
-        if "integration" in config_dict:
-            for k, v in config_dict["integration"].items():
-                if hasattr(config.integration, k):
-                    setattr(config.integration, k, v)
+        # Update sections from file
+        sections = ["data", "model", "training", "logging", "integration"]
+        for section in sections:
+            if section in config_dict:
+                section_obj = getattr(config, section)
+                for key, value in config_dict[section].items():
+                    if hasattr(section_obj, key):
+                        setattr(section_obj, key, value)
         
         return config
     
     def to_file(self, config_path: str) -> None:
-        """Save configuration to file (YAML or JSON)"""
+        """Save configuration to file"""
         config_path = Path(config_path)
         
-        # Convert dataclasses to dictionaries
+        # Convert to dict
         config_dict = {
             "data": {k: v for k, v in vars(self.data).items()},
             "model": {k: v for k, v in vars(self.model).items()},
@@ -159,27 +128,28 @@ class UnifiedConfig:
             "integration": {k: v for k, v in vars(self.integration).items()}
         }
         
-        # Create directory if it doesn't exist
+        # Create directories if needed
         config_path.parent.mkdir(parents=True, exist_ok=True)
         
-        if config_path.suffix.lower() == ".yaml" or config_path.suffix.lower() == ".yml":
+        # Save based on extension
+        if config_path.suffix.lower() in [".yaml", ".yml"]:
             with open(config_path, "w") as f:
                 yaml.dump(config_dict, f, default_flow_style=False)
         elif config_path.suffix.lower() == ".json":
             with open(config_path, "w") as f:
                 json.dump(config_dict, f, indent=2)
         else:
-            raise ValueError(f"Unsupported configuration format: {config_path.suffix}")
+            raise ValueError(f"Unsupported config format: {config_path.suffix}")
     
     def get_training_args(self):
         """Get HuggingFace TrainingArguments from config"""
         from transformers import TrainingArguments
         
-        # Prepare DeepSpeed config if needed
+        # Check deepspeed config exists
         deepspeed = None
-        if self.training.use_deepspeed and self.training.deepspeed_config_path:
-            if os.path.exists(self.training.deepspeed_config_path):
-                deepspeed = self.training.deepspeed_config_path
+        if hasattr(self.training, "deepspeed") and self.training.deepspeed:
+            if os.path.exists(self.training.deepspeed):
+                deepspeed = self.training.deepspeed
         
         return TrainingArguments(
             output_dir=self.logging.output_dir,
@@ -213,3 +183,26 @@ class UnifiedConfig:
             hub_token=self.integration.hf_token,
             seed=self.integration.seed,
         )
+
+
+# Generate default config file if run directly
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Generate default configuration file")
+    parser.add_argument("--output", type=str, default="config.yaml", help="Output config file path")
+    args = parser.parse_args()
+    
+    # Create default config
+    config = UnifiedConfig()
+    
+    # Set recommended values for training Gemma-3-12B
+    config.training.per_device_train_batch_size = 2
+    config.training.gradient_accumulation_steps = 32
+    # config.training.use_peft = True
+    # config.training.use_4bit = True
+    config.training.max_seq_length = 2048
+    
+    # Save to file
+    config.to_file(args.output)
+    print(f"Default configuration saved to {args.output}")

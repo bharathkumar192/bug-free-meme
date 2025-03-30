@@ -1,122 +1,78 @@
 data:
-  input_file: "telugu_results.json"  # Your dataset file
-  output_dir: "processed_data"       # Where processed data will be saved
-  min_length: 50                     # Minimum text length to keep
-  max_length: 2048                   # Maximum text length to keep
-  data_percentage: 0.6               # Percentage of data to use
-  train_ratio: 0.9                   # Training set size
-  val_ratio: 0.05                    # Validation set size
-  test_ratio: 0.05                   # Test set size
-
-model:
-  model_name: "google/gemma-3-12b-pt"  # Base model to fine-tune
-  use_chat_template: true               # Whether to use chat formatting
-  chat_template: "{% for message in messages %}\n{% if message['role'] == 'user' %}\n<start_of_turn>user\n{{ message['content'] }}\n<end_of_turn>\n{% elif message['role'] == 'assistant' %}\n<start_of_turn>model\n{{ message['content'] }}\n<end_of_turn>\n{% endif %}\n{% endfor %}\n{% if add_generation_prompt %}\n<start_of_turn>model\n{% endif %}"
-
-
-training:
-  num_train_epochs: 3                  # Number of training epochs
-  per_device_train_batch_size: 2       # Batch size for training
-  per_device_eval_batch_size: 4        # Batch size for evaluation
-  gradient_accumulation_steps: 32       # Steps for gradient accumulation
-  lr_scheduler_type: "cosine"          # Added cosine decay scheduler
-  warmup_ratio: 0.05                   # Added warmup for training stability
-  learning_rate: 0.000002              # Training learning rate
-  weight_decay: 0.001                   # Weight decay for regularization
-  
-  # Memory optimization settings
-  fp16: false                           # Use mixed precision (FP16)
-  bf16: true                            # Use BF16 precision (for A100, H100)
-  gradient_checkpointing: true          # Save memory with gradient checkpointing
-
-  deepspeed: "ds_config_zero3.json"    # Using DeepSpeed ZeRO-3 for memory efficiency
-  
-  # PEFT/LoRA settings (parameter-efficient fine-tuning)
-  use_peft: false                      # Whether to use PEFT/LoRA
-  lora_r: 16                           # LoRA rank
-  lora_alpha: 32                       # LoRA alpha
-  lora_dropout: 0.05                   # LoRA dropout
-  
-  # Quantization settings
-  use_4bit: false                      # Use 4-bit quantization
-
-logging:
-  output_dir: "finetuned_model"        # Where model will be saved
-  logging_steps: 50                    # Log training metrics every X steps
-  save_steps: 500                      # Save checkpoint every X steps
-  eval_steps: 250                      # Evaluate model every X steps
-  save_total_limit: 5                  # Keep only last X checkpoints
-  report_to:
-    - wandb
-    - tensorboard
-
+  data_percentage: 0.6
+  input_file: telugu_results.json
+  max_length: 2048
+  min_length: 50
+  output_dir: processed_data
+  test_ratio: 0.05
+  train_ratio: 0.9
+  val_ratio: 0.05
 integration:
-  wandb_api_key: bc746fafa585f61730cdfd3c8226492c777f875a   # Your W&B API key
-  wandb_project: "telugu-gemma-sft"    # W&B project name
-  wandb_entity: null                   # W&B username or organization
-  
-  hf_token: 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  # Your HuggingFace token
-  push_to_hub: true                   # Whether to push model to HF Hub
-  hub_model_id: null                   # HF model ID (username/model-name)
-  
-  seed: 42                             # Random seed for reproducibilitydata:
-  input_file: "telugu_results.json"  # Your dataset file
-  output_dir: "processed_data"       # Where processed data will be saved
-  min_length: 50                     # Minimum text length to keep
-  max_length: 2048                   # Maximum text length to keep
-  train_ratio: 0.6                   # Training set size
-  val_ratio: 0.05                    # Validation set size
-  test_ratio: 0.05                   # Test set size
-
-model:
-  model_name: "google/gemma-3-12b-pt"  # Base model to fine-tune
-  use_chat_template: true               # Whether to use chat formatting
-  chat_template: "{% for message in messages %}\n{% if message['role'] == 'user' %}\n<start_of_turn>user\n{{ message['content'] }}\n<end_of_turn>\n{% elif message['role'] == 'assistant' %}\n<start_of_turn>model\n{{ message['content'] }}\n<end_of_turn>\n{% endif %}\n{% endfor %}\n{% if add_generation_prompt %}\n<start_of_turn>model\n{% endif %}"
-
-
-training:
-  num_train_epochs: 3                  # Number of training epochs
-  per_device_train_batch_size: 4       # Batch size for training
-  per_device_eval_batch_size: 4        # Batch size for evaluation
-  gradient_accumulation_steps: 8       # Steps for gradient accumulation
-  lr_scheduler_type: "cosine"          # Added cosine decay scheduler
-  warmup_ratio: 0.05                   # Added warmup for training stability
-  learning_rate: 0.000002              # Training learning rate
-  weight_decay: 0.001                   # Weight decay for regularization
-  
-  # Memory optimization settings
-  fp16: false                           # Use mixed precision (FP16)
-  bf16: true                            # Use BF16 precision (for A100, H100)
-  gradient_checkpointing: true          # Save memory with gradient checkpointing
-
-  deepspeed: "ds_config_zero3.json"    # Using DeepSpeed ZeRO-3 for memory efficiency
-  
-  # PEFT/LoRA settings (parameter-efficient fine-tuning)
-  use_peft: false                      # Whether to use PEFT/LoRA
-  lora_r: 16                           # LoRA rank
-  lora_alpha: 32                       # LoRA alpha
-  lora_dropout: 0.05                   # LoRA dropout
-  
-  # Quantization settings
-  use_4bit: false                      # Use 4-bit quantization
-
+  hf_token: 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
+  hub_model_id: null
+  push_to_hub: true
+  seed: 42
+  wandb_api_key: bc746fafa585f61730cdfd3c8226492c777f875a
+  wandb_entity: null
+  wandb_project: telugu-gemma-sft
 logging:
-  output_dir: "finetuned_model"        # Where model will be saved
-  logging_steps: 50                    # Log training metrics every X steps
-  save_steps: 500                      # Save checkpoint every X steps
-  eval_steps: 250                      # Evaluate model every X steps
-  save_total_limit: 5                  # Keep only last X checkpoints
+  eval_steps: 250
+  logging_steps: 50
+  output_dir: finetuned_model
   report_to:
-    - wandb
-    - tensorboard
+  - wandb
+  - tensorboard
+  save_steps: 500
+  save_total_limit: 5
+model:
+  chat_template: '{% for message in messages %}
 
-integration:
-  wandb_api_key: bc746fafa585f61730cdfd3c8226492c777f875a   # Your W&B API key
-  wandb_project: "telugu-gemma-sft"    # W&B project name
-  wandb_entity: null                   # W&B username or organization
-  
-  hf_token: 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  # Your HuggingFace token
-  push_to_hub: true                   # Whether to push model to HF Hub
-  hub_model_id: null                   # HF model ID (username/model-name)
-  
-  seed: 42                             # Random seed for reproducibility
+    {% if message[''role''] == ''user'' %}
+
+    <start_of_turn>user
+
+    {{ message[''content''] }}
+
+    <end_of_turn>
+
+    {% elif message[''role''] == ''assistant'' %}
+
+    <start_of_turn>model
+
+    {{ message[''content''] }}
+
+    <end_of_turn>
+
+    {% endif %}
+
+    {% endfor %}
+
+    {% if add_generation_prompt %}
+
+    <start_of_turn>model
+
+    {% endif %}'
+  model_name: google/gemma-3-12b-pt
+  use_chat_template: true
+training:
+  bf16: true
+  bnb_4bit_compute_dtype: bfloat16
+  deepspeed: ds_config_zero3.json
+  early_stopping_patience: 3
+  fp16: false
+  gradient_accumulation_steps: 32
+  gradient_checkpointing: true
+  learning_rate: 2.0e-06
+  lora_alpha: 32
+  lora_dropout: 0.05
+  lora_r: 16
+  lr_scheduler_type: cosine
+  max_grad_norm: 1.0
+  max_seq_length: 2048
+  num_train_epochs: 3
+  per_device_eval_batch_size: 2
+  per_device_train_batch_size: 2
+  use_4bit: false
+  use_peft: false
+  warmup_ratio: 0.05
+  weight_decay: 0.01

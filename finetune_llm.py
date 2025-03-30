@@ -158,8 +158,6 @@ class DatasetProcessor:
         
         # Calculate reduction based on data_percentage if it exists
         total_original_size = len(shuffled_data)
-        if hasattr(self.config.data, 'data_percentage'):
-            print(f"===========data_percentage: {self.config.data.data_percentage}")
         data_percentage = getattr(self.config.data, 'data_percentage', 1.0)  # Default to 100% if not specified
         print(f"===========data_percentage: {data_percentage}")
         reduced_size = int(total_original_size * data_percentage)
