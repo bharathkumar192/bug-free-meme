@@ -15,9 +15,9 @@ model:
 
 training:
   num_train_epochs: 3                  # Number of training epochs
-  per_device_train_batch_size: 4       # Batch size for training
+  per_device_train_batch_size: 2       # Batch size for training
   per_device_eval_batch_size: 4        # Batch size for evaluation
-  gradient_accumulation_steps: 8       # Steps for gradient accumulation
+  gradient_accumulation_steps: 32       # Steps for gradient accumulation
   lr_scheduler_type: "cosine"          # Added cosine decay scheduler
   warmup_ratio: 0.05                   # Added warmup for training stability
   learning_rate: 0.000002              # Training learning rate
@@ -63,7 +63,7 @@ integration:
   output_dir: "processed_data"       # Where processed data will be saved
   min_length: 50                     # Minimum text length to keep
   max_length: 2048                   # Maximum text length to keep
-  train_ratio: 0.9                   # Training set size
+  train_ratio: 0.6                   # Training set size
   val_ratio: 0.05                    # Validation set size
   test_ratio: 0.05                   # Test set size
 
