@@ -22,11 +22,14 @@ This repository contains a comprehensive pipeline for fine-tuning Large Language
 - See `requirements.txt` for Python package dependencies
 
 ## Installation
+```bash
+ssh-keygen -t ed25519 -C "bharathkumar1922001@gmail.com"
+cat ~/.ssh/id_ed25519.pub
+```
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd <repository-name>
+git clone https://github.com/bharathkumar192/bug-free-meme.git
 ```
 
 2. Create a virtual environment (recommended):
