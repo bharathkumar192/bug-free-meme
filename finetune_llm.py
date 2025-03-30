@@ -158,8 +158,8 @@ class DatasetProcessor:
         
         # Calculate split sizes
         total_size = len(shuffled_data)
-        val_size = int(total_size * self.config.data.val_size)
-        test_size = int(total_size * self.config.data.test_size)
+        val_size = int(total_size * self.config.data.val_ratio)  # Changed from val_size to val_ratio
+        test_size = int(total_size * self.config.data.test_ratio)
         train_size = total_size - val_size - test_size
         
         # Split the data
