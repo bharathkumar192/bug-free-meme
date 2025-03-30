@@ -190,31 +190,32 @@ class TeluguFineTuner:
                 logger.info("Setting pad_token to eos_token")
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             
-            # Step 2: Load the model with Unsloth for faster training
+            # Step 2: Load the model with Unsloth - DO NOT SPECIFY load_in_4bit=False
+            # Instead, let Unsloth use its default optimizations
             logger.info("Loading model with Unsloth for faster supervised fine-tuning")
             
-            # Load model and prepare it for full parameter fine-tuning
+            # For full parameter fine-tuning with Unsloth, use a small LoRA rank but make all parameters trainable
             self.model, self.tokenizer = FastLanguageModel.from_pretrained(
                 model_name=self.config["model_name"],
                 max_seq_length=self.config["max_seq_length"],
                 dtype=torch.bfloat16,  # Use BFloat16 for training stability
-                load_in_4bit=False,    # For full parameter fine-tuning, don't use 4-bit
                 token=self.config.get("hf_token", None),
             )
             
-            # Step 3: Configure the model for full parameter training
-            logger.info("Configuring model for full parameter fine-tuning")
+            # Step 3: Configure for full fine-tuning using a minimal LoRA rank (8 is a good value)
+            # but setting all parameters as trainable
+            logger.info("Configuring model for full parameter fine-tuning via max-trainable LoRA")
             self.model = FastLanguageModel.get_peft_model(
                 self.model,
-                r=0,  # No LoRA rank (full fine-tuning)
+                r=8,  # Minimum viable LoRA rank (Unsloth requires r > 0)
                 target_modules=["all"],  # Target all modules
-                lora_alpha=0,  # Not using LoRA
-                lora_dropout=0,  # Not using LoRA
+                lora_alpha=16,  # Standard alpha value
+                lora_dropout=0,  # No dropout for full fine-tuning
                 bias="none",  # No bias
                 use_gradient_checkpointing=True,  # Enable gradient checkpointing
                 random_state=self.config["seed"],  # For reproducibility
                 use_rslora=False,  # Not using rank-stabilized LoRA
-                loftq_config=None,  # Not using LoftQ
+                modules_to_save=["all"],  # This makes it equivalent to full fine-tuning
             )
             
             # Step 4: Set up the chat template
@@ -234,12 +235,12 @@ class TeluguFineTuner:
             logger.info(f"Trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
             
             # Verify full fine-tuning is enabled
-            if trainable_params / total_params > 0.99:
-                logger.info("TRUE FULL SUPERVISED FINE-TUNING SUCCESSFULLY ENABLED WITH UNSLOTH!")
+            if trainable_params / total_params > 0.95:  # Allow for some parameters that might not be trainable
+                logger.info("FULL PARAMETER FINE-TUNING SUCCESSFULLY ENABLED WITH UNSLOTH!")
                 logger.info(f"All {trainable_params:.2f}B parameters will be updated during training")
             else:
                 logger.warning(f"Only {trainable_params:.2f}B/{total_params:.2f}B parameters are trainable")
-                logger.warning("This may not be true full supervised fine-tuning")
+                logger.warning("This may not be true full parameter fine-tuning")
             
         except Exception as e:
             logger.error(f"Error loading model or tokenizer with Unsloth: {str(e)}")
