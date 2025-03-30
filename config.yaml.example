@@ -1,0 +1,55 @@
+data:
+  input_file: "telugu_results.json"  # Your dataset file
+  output_dir: "processed_data"       # Where processed data will be saved
+  min_length: 50                     # Minimum text length to keep
+  max_length: 2048                   # Maximum text length to keep
+  train_ratio: 0.9                   # Training set size
+  val_ratio: 0.05                    # Validation set size
+  test_ratio: 0.05                   # Test set size
+
+model:
+  model_name: "google/gemma-3-12b-pt"  # Base model to fine-tune
+  use_chat_template: true               # Whether to use chat formatting
+
+training:
+  num_train_epochs: 3                  # Number of training epochs
+  per_device_train_batch_size: 2       # Batch size for training
+  per_device_eval_batch_size: 2        # Batch size for evaluation
+  gradient_accumulation_steps: 16      # Steps for gradient accumulation
+  learning_rate: 0.000002              # Training learning rate
+  weight_decay: 0.01                   # Weight decay for regularization
+  
+  # Memory optimization settings
+  fp16: true                           # Use mixed precision (FP16)
+  bf16: false                          # Use BF16 precision (for A100, H100)
+  gradient_checkpointing: true         # Save memory with gradient checkpointing
+  
+  # PEFT/LoRA settings (parameter-efficient fine-tuning)
+  use_peft: false                      # Whether to use PEFT/LoRA
+  lora_r: 16                           # LoRA rank
+  lora_alpha: 32                       # LoRA alpha
+  lora_dropout: 0.05                   # LoRA dropout
+  
+  # Quantization settings
+  use_4bit: false                      # Use 4-bit quantization
+
+logging:
+  output_dir: "finetuned_model"        # Where model will be saved
+  logging_steps: 10                    # Log training metrics every X steps
+  save_steps: 100                      # Save checkpoint every X steps
+  eval_steps: 100                      # Evaluate model every X steps
+  save_total_limit: 5                  # Keep only last X checkpoints
+  report_to:
+    - wandb
+    - tensorboard
+
+integration:
+  wandb_api_key: null                  # Your W&B API key
+  wandb_project: "telugu-gemma-sft"    # W&B project name
+  wandb_entity: null                   # W&B username or organization
+  
+  hf_token: null                       # Your HuggingFace token
+  push_to_hub: false                   # Whether to push model to HF Hub
+  hub_model_id: null                   # HF model ID (username/model-name)
+  
+  seed: 42                             # Random seed for reproducibility

@@ -7,6 +7,12 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 import re
+import os
+import sys
+
+# Add parent directory to path to import config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import UnifiedConfig
 
 # Configure logging
 logging.basicConfig(
@@ -16,23 +22,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class DataPreparator:
-    def __init__(
-        self,
-        input_file: str,
-        output_dir: str,
-        min_length: int = 50,
-        max_length: int = 2048,
-        train_ratio: float = 0.9,
-        val_ratio: float = 0.05,
-        test_ratio: float = 0.05,
-    ):
-        self.input_file = input_file
-        self.output_dir = Path(output_dir)
-        self.min_length = min_length
-        self.max_length = max_length
-        self.train_ratio = train_ratio
-        self.val_ratio = val_ratio
-        self.test_ratio = test_ratio
+    def __init__(self, config: UnifiedConfig):
+        """Initialize with unified configuration"""
+        self.config = config
+        self.input_file = config.data.input_file
+        self.output_dir = Path(config.data.output_dir)
+        self.min_length = config.data.min_length
+        self.max_length = config.data.max_length
+        self.train_ratio = config.data.train_ratio
+        self.val_ratio = config.data.val_ratio
+        self.test_ratio = config.data.test_ratio
         
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -99,6 +98,9 @@ class DataPreparator:
     
     def create_splits(self, data: List[Dict[str, Any]]) -> Dict[str, Dataset]:
         """Create train/validation/test splits"""
+        # Ensure deterministic results
+        np.random.seed(self.config.integration.seed)
+        
         # Shuffle data
         np.random.shuffle(data)
         
@@ -185,18 +187,21 @@ class DataPreparator:
             raise
 
 def main():
-    # Example usage
-    preparator = DataPreparator(
-        input_file="telugu_results.json", 
-        output_dir="processed_data",
-        min_length=50,
-        max_length=2048,
-        train_ratio=0.9,
-        val_ratio=0.05,
-        test_ratio=0.05
-    )
+    # Load unified configuration
+    import argparse
     
+    parser = argparse.ArgumentParser(description="Prepare data for LLM fine-tuning")
+    parser.add_argument("--config", type=str, default="config.yaml", help="Path to configuration file")
+    args = parser.parse_args()
+    
+    # Load configuration
+    config = UnifiedConfig.from_file(args.config)
+    
+    # Initialize data preparator with configuration
+    preparator = DataPreparator(config)
+    
+    # Process data
     preparator.process()
 
 if __name__ == "__main__":
-    main() 
+    main()
