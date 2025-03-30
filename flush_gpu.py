@@ -2,11 +2,6 @@
 import torch
 import gc
 
-# Assuming 'model', 'optimizer', 'large_tensor' exist
-del model
-del optimizer 
-del large_tensor 
-# Add any other large GPU variables you created
 
 # For PyTorch - release cached memory (doesn't release actively used memory)
 if torch.cuda.is_available():
