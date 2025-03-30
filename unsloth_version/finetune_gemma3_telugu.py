@@ -182,7 +182,7 @@ class TeluguFineTuner:
                 load_in_8bit=False,  # Not using 8-bit quantization for full fine-tuning
                 
                 # IMPORTANT: These parameters need to be set correctly for full fine-tuning
-                fast_tokenizer=True,
+                # fast_tokenizer=True,
                 # The key parameters for full fine-tuning:
                 full_finetune=True,     # Enable full fine-tuning
                 # use_peft=False,         # Disable PEFT (LoRA)
