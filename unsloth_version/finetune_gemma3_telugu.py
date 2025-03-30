@@ -13,7 +13,7 @@ from pathlib import Path
 from datasets import Dataset
 from transformers import TrainingArguments, EarlyStoppingCallback
 from trl import SFTTrainer
-from Gemini_dataset.training_files.unsloth_version.unsloth import FastModel
+from unsloth import FastModel
 from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
 
 # Load configuration
