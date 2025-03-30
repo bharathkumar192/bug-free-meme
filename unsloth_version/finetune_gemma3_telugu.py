@@ -17,7 +17,7 @@ from unsloth import FastModel
 from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
 
 # Load configuration
-from Gemini_dataset.training_files.unsloth_version.config_loader import load_config
+from config_loader import load_config
 
 # Configure logging
 logging.basicConfig(
