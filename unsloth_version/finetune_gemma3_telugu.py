@@ -261,7 +261,7 @@ class TeluguFineTuner:
                 seed=self.config["seed"],
                 group_by_length=True,
                 ddp_find_unused_parameters=False,
-                deepspeed="ds_config.json",
+                # deepspeed="ds_config.json",
             )
             
             # Define training process for full supervised fine-tuning

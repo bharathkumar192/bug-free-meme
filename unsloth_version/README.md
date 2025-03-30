@@ -188,3 +188,13 @@ Common issues and solutions:
    - Verify Unsloth is properly installed and configured
 
 3
+
+
+
+
+
+
+
+
+export DEEPSPEED_BYPASS_CUDA_CHECK=1
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
