@@ -156,16 +156,22 @@ class DatasetProcessor:
         shuffled_data = deepcopy(data)
         random.shuffle(shuffled_data)
         
-        # Calculate split sizes
-        total_size = len(shuffled_data)
-        val_size = int(total_size * self.config.data.val_ratio)  # Changed from val_size to val_ratio
+        # Calculate reduction based on data_percentage if it exists
+        total_original_size = len(shuffled_data)
+        data_percentage = getattr(self.config.data, 'data_percentage', 1.0)  # Default to 100% if not specified
+        reduced_size = int(total_original_size * data_percentage)
+        reduced_data = shuffled_data[:reduced_size]
+        
+        # Calculate split sizes on the reduced data
+        total_size = len(reduced_data)
+        val_size = int(total_size * self.config.data.val_ratio)
         test_size = int(total_size * self.config.data.test_ratio)
         train_size = total_size - val_size - test_size
         
         # Split the data
-        train_data = shuffled_data[:train_size]
-        val_data = shuffled_data[train_size:train_size + val_size]
-        test_data = shuffled_data[train_size + val_size:]
+        train_data = reduced_data[:train_size]
+        val_data = reduced_data[train_size:train_size + val_size]
+        test_data = reduced_data[train_size + val_size:]
         
         return train_data, val_data, test_data
     

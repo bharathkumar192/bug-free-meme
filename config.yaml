@@ -3,6 +3,7 @@ data:
   output_dir: "processed_data"       # Where processed data will be saved
   min_length: 50                     # Minimum text length to keep
   max_length: 2048                   # Maximum text length to keep
+  data_percentage: 0.6               # Percentage of data to use
   train_ratio: 0.9                   # Training set size
   val_ratio: 0.05                    # Validation set size
   test_ratio: 0.05                   # Test set size
