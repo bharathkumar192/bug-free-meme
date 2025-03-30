@@ -11,17 +11,17 @@ import numpy as np
 import argparse
 from pathlib import Path
 from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
-from unsloth import FastLanguageModel 
-from trl import SFTTrainer
+# from trl import SFTTrainer
+from transformers import Trainer, DataCollatorForLanguageModeling
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM, 
     AutoTokenizer,
     TrainingArguments, 
     EarlyStoppingCallback,
-    Trainer,
-    AutoProcessor, 
-    Gemma3ForConditionalGeneration
+    # Trainer,
+    # AutoProcessor, 
+    # Gemma3ForConditionalGeneration
 )
 
 # Load configuration
@@ -229,7 +229,7 @@ class TeluguFineTuner:
             # Add unsloth performance info
             logger.info("Using Unsloth for faster training")
             
-            # Configure training arguments
+
             # Configure training arguments
             training_args = TrainingArguments(
                 output_dir=self.config["output_dir"],
@@ -267,14 +267,31 @@ class TeluguFineTuner:
             logger.info("Initializing SFT trainer for full supervised fine-tuning")
             
             # Initialize SFT trainer
-            trainer = SFTTrainer(
+            # trainer = SFTTrainer(
+            #     model=self.model,
+            #     tokenizer=self.tokenizer,
+            #     train_dataset=train_dataset,
+            #     eval_dataset=eval_dataset,
+            #     args=training_args,
+            #     dataset_text_field="text",
+            #     max_seq_length=self.config["max_seq_length"],
+            #     callbacks=[
+            #         EarlyStoppingCallback(
+            #             early_stopping_patience=self.config["early_stopping_patience"]
+            #         )
+            #     ] if eval_dataset else None,
+            # )
+
+            trainer = Trainer(
                 model=self.model,
                 tokenizer=self.tokenizer,
+                args=training_args,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
-                args=training_args,
-                dataset_text_field="text",
-                max_seq_length=self.config["max_seq_length"],
+                data_collator=DataCollatorForLanguageModeling(
+                    tokenizer=self.tokenizer, 
+                    mlm=False
+                ),
                 callbacks=[
                     EarlyStoppingCallback(
                         early_stopping_patience=self.config["early_stopping_patience"]
