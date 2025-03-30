@@ -396,6 +396,10 @@ class LLMFineTuner:
                 self.config.model.model_name,
                 **model_kwargs
             )
+
+            if hasattr(self.model.config, "use_cache"):
+                self.model.config.use_cache = not self.config.training.gradient_checkpointing
+                logger.info(f"Setting model config use_cache={self.model.config.use_cache}")
             
             # Apply LoRA if configured
             if self.config.training.use_peft:

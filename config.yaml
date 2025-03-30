@@ -53,7 +53,7 @@ integration:
   wandb_entity: null                   # W&B username or organization
   
   hf_token: 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  # Your HuggingFace token
-  push_to_hub: false                   # Whether to push model to HF Hub
+  push_to_hub: true                   # Whether to push model to HF Hub
   hub_model_id: null                   # HF model ID (username/model-name)
   
   seed: 42                             # Random seed for reproducibility
