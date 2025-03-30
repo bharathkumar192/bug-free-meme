@@ -101,6 +101,10 @@ main() {
   
   # Memory optimization
   export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+
+  apt-get update && apt-get install -y git-lfs
+  git lfs install
+  git lfs pull
   
   # Start training
   # python finetune_gemma3_telugu.py
