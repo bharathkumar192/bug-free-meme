@@ -172,6 +172,10 @@ class DatasetProcessor:
         train_data = reduced_data[:train_size]
         val_data = reduced_data[train_size:train_size + val_size]
         test_data = reduced_data[train_size + val_size:]
+
+        print(f"===========train_data: {len(train_data)}")
+        print(f"===========val_data: {len(val_data)}")
+        print(f"===========test_data: {len(test_data)}")
         
         return train_data, val_data, test_data
     
