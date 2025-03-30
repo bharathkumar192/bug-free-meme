@@ -251,8 +251,8 @@ class TeluguFineTuner:
                 save_strategy="steps",
                 load_best_model_at_end=True if eval_dataset else False,
                 report_to="wandb" if self.config["use_wandb"] else "none",
-                fp16=True,
-                bf16=False,  # Use bfloat16 precision
+                # fp16=True,
+                bf16=True,  # Use bfloat16 precision
                 gradient_checkpointing=True,  # Enable gradient checkpointing for memory efficiency
                 optim=self.config["optimizer"],
                 push_to_hub=self.config["push_to_hub"],
