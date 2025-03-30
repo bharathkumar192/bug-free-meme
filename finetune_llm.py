@@ -366,7 +366,7 @@ class LLMFineTuner:
                 "device_map": "auto",
                 "trust_remote_code": True,
                 "torch_dtype": torch_dtype,
-                "use_cache": not self.config.training.gradient_checkpointing,
+                # "use_cache": not self.config.training.gradient_checkpointing,
             }
             
             # Add quantization if configured
