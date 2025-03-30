@@ -9,7 +9,7 @@ num_train_epochs: 3
 per_device_train_batch_size: 1  # For 80GB GPUs, can use higher values (adjust based on OOM errors)
 per_device_eval_batch_size: 1
 gradient_accumulation_steps: 16  # Adjust based on GPU memory
-learning_rate: 1e-5  # Typical for full fine-tuning
+learning_rate: 0.00001  # Instead of 1e-5
 weight_decay: 0.01
 max_grad_norm: 1.0
 warmup_ratio: 0.05
