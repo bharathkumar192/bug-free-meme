@@ -13,16 +13,20 @@ model:
 
 training:
   num_train_epochs: 3                  # Number of training epochs
-  per_device_train_batch_size: 2       # Batch size for training
-  per_device_eval_batch_size: 2        # Batch size for evaluation
-  gradient_accumulation_steps: 16      # Steps for gradient accumulation
+  per_device_train_batch_size: 4       # Batch size for training
+  per_device_eval_batch_size: 4        # Batch size for evaluation
+  gradient_accumulation_steps: 8       # Steps for gradient accumulation
+  lr_scheduler_type: "cosine"          # Added cosine decay scheduler
+  warmup_ratio: 0.05                   # Added warmup for training stability
   learning_rate: 0.000002              # Training learning rate
-  weight_decay: 0.01                   # Weight decay for regularization
+  weight_decay: 0.001                   # Weight decay for regularization
   
   # Memory optimization settings
-  fp16: true                           # Use mixed precision (FP16)
-  bf16: false                          # Use BF16 precision (for A100, H100)
-  gradient_checkpointing: true         # Save memory with gradient checkpointing
+  fp16: false                           # Use mixed precision (FP16)
+  bf16: true                            # Use BF16 precision (for A100, H100)
+  gradient_checkpointing: true          # Save memory with gradient checkpointing
+
+  deepspeed: "ds_config_zero3.json"    # Using DeepSpeed ZeRO-3 for memory efficiency
   
   # PEFT/LoRA settings (parameter-efficient fine-tuning)
   use_peft: false                      # Whether to use PEFT/LoRA
@@ -35,20 +39,20 @@ training:
 
 logging:
   output_dir: "finetuned_model"        # Where model will be saved
-  logging_steps: 10                    # Log training metrics every X steps
-  save_steps: 100                      # Save checkpoint every X steps
-  eval_steps: 100                      # Evaluate model every X steps
+  logging_steps: 50                    # Log training metrics every X steps
+  save_steps: 500                      # Save checkpoint every X steps
+  eval_steps: 250                      # Evaluate model every X steps
   save_total_limit: 5                  # Keep only last X checkpoints
   report_to:
     - wandb
     - tensorboard
 
 integration:
-  wandb_api_key: null                  # Your W&B API key
+  wandb_api_key: bc746fafa585f61730cdfd3c8226492c777f875a   # Your W&B API key
   wandb_project: "telugu-gemma-sft"    # W&B project name
   wandb_entity: null                   # W&B username or organization
   
-  hf_token: null                       # Your HuggingFace token
+  hf_token: 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  # Your HuggingFace token
   push_to_hub: false                   # Whether to push model to HF Hub
   hub_model_id: null                   # HF model ID (username/model-name)
   
