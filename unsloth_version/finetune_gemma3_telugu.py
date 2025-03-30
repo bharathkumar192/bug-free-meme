@@ -191,7 +191,8 @@ class TeluguFineTuner:
             # Load model
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.config["model_name"],
-                device_map="auto",
+                # device_map="auto",
+                device_map=None
                 torch_dtype=torch.bfloat16,
                 trust_remote_code=True,
                 token=self.config.get("hf_token", None),
@@ -316,6 +317,8 @@ class TeluguFineTuner:
 def main():
     parser = argparse.ArgumentParser(description="Full Fine-tune Gemma-3 model for Telugu")
     parser.add_argument("--config", type=str, default="config.yaml", help="Path to configuration file")
+    parser.add_argument("--local_rank", type=int, default=-1, help="Local rank for distributed training")
+
     args = parser.parse_args()
     
     # Load configuration
