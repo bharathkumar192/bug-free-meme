@@ -8,10 +8,11 @@ from transformers import (
     DataCollatorForSeq2SeqLanguageModeling,
     EarlyStoppingCallback,
     default_data_collator,
+    HfArgumentParser,
 )
 from datasets import load_dataset, Dataset
 import wandb
-from typing import Dict, Sequence, List, Any
+from typing import Dict, Sequence, List, Any, Optional
 import logging
 import numpy as np
 from dataclasses import dataclass, field
@@ -24,6 +25,10 @@ import glob
 from copy import deepcopy
 import shutil
 import re
+from huggingface_hub import HfApi, upload_folder
+from tqdm import tqdm
+import time
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -39,17 +44,17 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TrainingConfig:
     # Model configuration
-    model_name: str = "meta-llama/Llama-2-7b-hf"  # Base model
+    model_name: str = "google/gemma-3-12b-pt"  # Base model
     dataset_path: str = "telugu_results.json"  # Path to dataset
     output_dir: str = "finetuned_model"  # Output directory
     
     # Training parameters
     num_train_epochs: int = 3
-    per_device_train_batch_size: int = 2
-    per_device_eval_batch_size: int = 4
-    gradient_accumulation_steps: int = 16
-    learning_rate: float = 2e-6
-    weight_decay: float = 0.01
+    per_device_train_batch_size: int = 2  # Reduced for 12B model
+    per_device_eval_batch_size: int = 2  # Reduced for 12B model
+    gradient_accumulation_steps: int = 16  # Increased for larger model
+    learning_rate: float = 2e-6  # Lower learning rate for larger model
+    weight_decay: float = 0.01  # Weight decay for regularization
     max_grad_norm: float = 1.0
     
     # Scheduler settings
@@ -70,7 +75,7 @@ class TrainingConfig:
     
     # Optimization settings
     fp16: bool = True
-    bf16: bool = False  # Set to True if only GPU supports it (A100, H100, etc.)
+    bf16: bool = False  # Set to True if your GPU supports it (A100, H100, etc.)
     gradient_checkpointing: bool = True
     
     # DeepSpeed configuration (optional)
@@ -80,10 +85,19 @@ class TrainingConfig:
     val_size: float = 0.05
     test_size: float = 0.05
     seed: int = 42
-    prompt_template: str = "Question: {question}\nAnswer: "
     
-    # Tracking
-    report_to: List[str] = field(default_factory=lambda: ["wandb"])
+    # Chat template settings for Gemma
+    use_chat_template: bool = True
+    
+    # Tracking integrations
+    wandb_project: str = "telugu-gemma-sft"
+    wandb_entity: Optional[str] = None
+    push_to_hub: bool = False
+    hub_model_id: Optional[str] = None
+    hub_token: Optional[str] = None
+    
+    # Report to
+    report_to: List[str] = field(default_factory=lambda: ["wandb", "tensorboard"])
     
     # Function to get the training arguments
     def get_training_args(self):
@@ -114,6 +128,9 @@ class TrainingConfig:
             optim="adamw_torch", 
             ddp_find_unused_parameters=False,
             group_by_length=True,  # Improves efficiency by grouping similar lengths
+            hub_model_id=self.hub_model_id if self.push_to_hub else None,
+            push_to_hub=self.push_to_hub,
+            hub_token=self.hub_token,
         )
 
 class DatasetProcessor:
@@ -195,15 +212,28 @@ class DatasetProcessor:
             
             if not question or not response:
                 continue
-                
-            # Create input-output pairs for training
-            processed_data.append({
-                'question': question,
-                'response': response,
-                # Additional metadata that might be useful
-                'q_length': len(question),
-                'r_length': len(response),
-            })
+            
+            # Format data for Gemma chat format
+            if self.config.use_chat_template:
+                messages = [
+                    {"role": "user", "content": question},
+                    {"role": "assistant", "content": response}
+                ]
+                processed_data.append({
+                    "messages": messages,
+                    # Additional metadata that might be useful
+                    'q_length': len(question),
+                    'r_length': len(response),
+                })
+            else:
+                # Standard format if not using chat template
+                processed_data.append({
+                    'question': question,
+                    'response': response,
+                    # Additional metadata that might be useful
+                    'q_length': len(question),
+                    'r_length': len(response),
+                })
         
         logger.info(f"Processed {len(processed_data)} valid examples")
         return processed_data
@@ -235,44 +265,65 @@ class DatasetProcessor:
         
         def tokenize_function(examples):
             """Tokenize examples for supervised fine-tuning"""
-            # Format as instruction following
-            model_inputs = {"input_ids": [], "attention_mask": [], "labels": []}
-            
-            for question, response in zip(examples["question"], examples["response"]):
-                # Prepare the input (instruction/prompt format)
-                prompt = self.config.prompt_template.format(question=question)
-                prompt_ids = self.tokenizer(prompt, return_tensors="pt").input_ids[0]
+            if self.config.use_chat_template:
+                # Use the model's chat template for formatting
+                formatted_inputs = []
+                for messages in examples["messages"]:
+                    formatted_inputs.append(self.tokenizer.apply_chat_template(
+                        messages, 
+                        tokenize=False,
+                        add_generation_prompt=False
+                    ))
                 
-                # Prepare the full sequence (input + response)
-                full_text = prompt + response
-                tokenized_full = self.tokenizer(
-                    full_text, 
+                # Tokenize formatted inputs
+                tokenized = self.tokenizer(
+                    formatted_inputs,
                     truncation=True,
                     max_length=self.config.max_seq_length,
                     padding="max_length",
                     return_tensors="pt"
                 )
                 
-                input_ids = tokenized_full.input_ids[0]
-                attention_mask = tokenized_full.attention_mask[0]
+                # Return tokenized inputs with labels
+                tokenized["labels"] = tokenized["input_ids"].clone()
                 
-                # Create label mask: -100 for prompt (ignored in loss), actual token IDs for response
-                # Find the prompt length in tokenized form
-                prompt_len = len(prompt_ids)
+                return tokenized
+            else:
+                # Standard approach (non-chat template)
+                model_inputs = {"input_ids": [], "attention_mask": [], "labels": []}
                 
-                # Create labels: -100 for prompt, actual IDs for response
-                labels = input_ids.clone()
-                labels[:prompt_len] = -100  # Mask prompt tokens
-                
-                model_inputs["input_ids"].append(input_ids)
-                model_inputs["attention_mask"].append(attention_mask)
-                model_inputs["labels"].append(labels)
-                
-            # Convert lists to tensors
-            for key in model_inputs:
-                model_inputs[key] = torch.stack(model_inputs[key])
-                
-            return model_inputs
+                for question, response in zip(examples["question"], examples["response"]):
+                    # Prepare the input
+                    prompt = f"Question: {question}\nAnswer: "
+                    prompt_ids = self.tokenizer(prompt, return_tensors="pt").input_ids[0]
+                    
+                    # Prepare the full sequence
+                    full_text = prompt + response
+                    tokenized_full = self.tokenizer(
+                        full_text, 
+                        truncation=True,
+                        max_length=self.config.max_seq_length,
+                        padding="max_length",
+                        return_tensors="pt"
+                    )
+                    
+                    input_ids = tokenized_full.input_ids[0]
+                    attention_mask = tokenized_full.attention_mask[0]
+                    
+                    # Create labels: -100 for prompt, actual IDs for response
+                    prompt_len = len(prompt_ids)
+                    labels = input_ids.clone()
+                    labels[:prompt_len] = -100  # Mask prompt tokens
+                    
+                    model_inputs["input_ids"].append(input_ids)
+                    model_inputs["attention_mask"].append(attention_mask)
+                    model_inputs["labels"].append(labels)
+                    
+                # Convert lists to tensors
+                for key in model_inputs:
+                    model_inputs[key] = torch.stack(model_inputs[key])
+                    
+                return model_inputs
         
         # Apply tokenization
         tokenized_train = train_dataset.map(
@@ -306,7 +357,7 @@ class LLMFineTuner:
         
         # Initialize components
         self.setup_directories()
-        self.setup_wandb()
+        self.setup_tracking()
         self.setup_model_and_tokenizer()
         
         # Setup dataset processor
@@ -326,14 +377,38 @@ class LLMFineTuner:
         backup_dir = os.path.join(self.config.output_dir, "backups")
         os.makedirs(backup_dir, exist_ok=True)
         
-    def setup_wandb(self):
-        """Initialize Weights & Biases for experiment tracking"""
+        # Create tensorboard directory
+        tensorboard_dir = os.path.join(self.config.output_dir, "tensorboard")
+        os.makedirs(tensorboard_dir, exist_ok=True)
+        
+    def setup_tracking(self):
+        """Initialize tracking platforms (W&B, HuggingFace)"""
+        # Setup Weights & Biases
         if "wandb" in self.config.report_to:
-            wandb.init(
-                project="telugu-llm-finetuning",
-                config=vars(self.config),
-                name=f"{self.config.model_name.split('/')[-1]}-sft",
-            )
+            try:
+                wandb.init(
+                    project=self.config.wandb_project,
+                    entity=self.config.wandb_entity,
+                    config=vars(self.config),
+                    name=f"gemma-3-12b-telugu-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                    tags=["gemma-3", "telugu", "sft"],
+                )
+                logger.info("Successfully initialized Weights & Biases tracking")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Weights & Biases: {e}")
+                if "wandb" in self.config.report_to:
+                    self.config.report_to.remove("wandb")
+        
+        # Setup HuggingFace Hub
+        if self.config.push_to_hub:
+            try:
+                api = HfApi(token=self.config.hub_token)
+                # Validate token
+                api.whoami()
+                logger.info("Successfully authenticated with Hugging Face Hub")
+            except Exception as e:
+                logger.warning(f"Failed to authenticate with Hugging Face Hub: {e}")
+                self.config.push_to_hub = False
         
     def setup_model_and_tokenizer(self):
         """Initialize model and tokenizer"""
@@ -346,6 +421,11 @@ class LLMFineTuner:
                 truncation_side="right",
             )
             
+            # Ensure tokenizer has chat template for Gemma-3
+            if self.config.use_chat_template and not hasattr(self.tokenizer, "chat_template"):
+                logger.warning("Tokenizer does not have a chat template. Setting default Gemma-3 template.")
+                self.tokenizer.chat_template = "{% for message in messages %}\n{% if message['role'] == 'user' %}\n<start_of_turn>user\n{{ message['content'] }}\n<end_of_turn>\n{% elif message['role'] == 'assistant' %}\n<start_of_turn>model\n{{ message['content'] }}\n<end_of_turn>\n{% endif %}\n{% endfor %}\n{% if add_generation_prompt %}\n<start_of_turn>model\n{% endif %}"
+            
             if self.tokenizer.pad_token is None:
                 logger.info("Setting pad_token to eos_token")
                 self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -353,6 +433,13 @@ class LLMFineTuner:
             logger.info(f"Loading model from {self.config.model_name}")
             torch_dtype = torch.bfloat16 if self.config.bf16 else (torch.float16 if self.config.fp16 else torch.float32)
             
+            # Check available GPU memory before loading model
+            if torch.cuda.is_available():
+                free_memory = torch.cuda.mem_get_info()[0] / (1024**3)  # Convert to GB
+                logger.info(f"Available GPU memory: {free_memory:.2f} GB")
+                if free_memory < 24:
+                    logger.warning("Less than 24GB GPU memory available. Training may fail.")
+                
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.config.model_name,
                 device_map="auto",
@@ -365,7 +452,19 @@ class LLMFineTuner:
                 logger.info("Enabling gradient checkpointing")
                 self.model.gradient_checkpointing_enable()
                 
-            logger.info(f"Model loaded successfully with {sum(p.numel() for p in self.model.parameters())/1e6:.2f}M parameters")
+            total_params = sum(p.numel() for p in self.model.parameters()) / 1e9
+            trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad) / 1e9
+            
+            logger.info(f"Model loaded successfully with {total_params:.2f}B parameters")
+            logger.info(f"Trainable parameters: {trainable_params:.2f}B")
+            
+            # Log model configuration to W&B
+            if "wandb" in self.config.report_to:
+                wandb.config.update({
+                    "model_size_b": total_params,
+                    "trainable_params_b": trainable_params,
+                    "model_name": self.config.model_name,
+                })
                 
         except Exception as e:
             logger.error(f"Error loading model or tokenizer: {str(e)}")
@@ -388,13 +487,41 @@ class LLMFineTuner:
             logger.info("Checkpoint backup completed")
         except Exception as e:
             logger.warning(f"Failed to backup checkpoint: {str(e)}")
+    
+    def log_training_progress(self, metrics, step, phase="train"):
+        """Log training progress to various platforms"""
+        if "wandb" in self.config.report_to:
+            wandb.log({f"{phase}/{k}": v for k, v in metrics.items()}, step=step)
         
+        # Log to console
+        metrics_str = ", ".join([f"{k}: {v:.4f}" for k, v in metrics.items()])
+        logger.info(f"{phase.capitalize()} step {step}: {metrics_str}")
+    
     def train(self):
         """Main training loop"""
+        start_time = time.time()
+        
         try:
             # Prepare dataset
             logger.info("Preparing dataset...")
             dataset = self.prepare_dataset()
+            
+            # Log dataset statistics
+            train_size = len(dataset["train"])
+            val_size = len(dataset["validation"])
+            test_size = len(dataset["test"])
+            
+            logger.info(f"Dataset statistics:")
+            logger.info(f"  Train size: {train_size}")
+            logger.info(f"  Validation size: {val_size}")
+            logger.info(f"  Test size: {test_size}")
+            
+            if "wandb" in self.config.report_to:
+                wandb.config.update({
+                    "train_examples": train_size,
+                    "val_examples": val_size,
+                    "test_examples": test_size,
+                })
             
             # Setup training arguments
             training_args = self.config.get_training_args()
@@ -417,6 +544,15 @@ class LLMFineTuner:
                 callbacks=callbacks,
                 data_collator=default_data_collator,
             )
+            
+            # Add custom logging
+            original_log = trainer.log
+            def custom_log(metrics, step=None, **kwargs):
+                # Call the original log method
+                original_log(metrics, step, **kwargs)
+                # Additional custom logging
+                self.log_training_progress(metrics, step)
+            trainer.log = custom_log
             
             # Check for checkpoint
             last_checkpoint = get_last_checkpoint(self.config.output_dir)
@@ -452,9 +588,23 @@ class LLMFineTuner:
             
             # Evaluate on test set
             logger.info("Evaluating on test set...")
-            test_metrics = trainer.evaluate(dataset["test"])
+            test_metrics = trainer.evaluate(dataset["test"], metric_key_prefix="test")
             trainer.log_metrics("test", test_metrics)
             trainer.save_metrics("test", test_metrics)
+            
+            # Calculate training time
+            total_time = time.time() - start_time
+            hours, remainder = divmod(total_time, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            logger.info(f"Training completed in {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}")
+            
+            if "wandb" in self.config.report_to:
+                wandb.log({"training_time_hours": total_time / 3600})
+            
+            # Push to hub if configured
+            if self.config.push_to_hub:
+                logger.info(f"Pushing model to Hugging Face Hub as {self.config.hub_model_id}")
+                trainer.push_to_hub()
             
             logger.info("Training completed successfully!")
             
@@ -466,12 +616,17 @@ class LLMFineTuner:
                 wandb.finish()
             
 def main():
-    # Load configuration
-    config = TrainingConfig()
+    # Parse command line arguments if needed
+    parser = HfArgumentParser(TrainingConfig)
+    if len(sys.argv) > 1:
+        config = parser.parse_args_into_dataclasses()[0]
+    else:
+        config = TrainingConfig()
     
     # Initialize and run training
     trainer = LLMFineTuner(config)
     trainer.train()
 
 if __name__ == "__main__":
+    import sys
     main() 
