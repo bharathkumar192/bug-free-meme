@@ -10,6 +10,9 @@ import random
 import numpy as np
 import argparse
 from pathlib import Path
+from trl import SFTTrainer
+from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
+from unsloth import FastLanguageModel 
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM, 
@@ -18,9 +21,6 @@ from transformers import (
     EarlyStoppingCallback,
     Trainer
 )
-from trl import SFTTrainer
-from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
-from unsloth import FastLanguageModel  # Add this import
 
 # Load configuration
 from config_loader import load_config
