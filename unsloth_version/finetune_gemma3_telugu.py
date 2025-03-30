@@ -63,6 +63,16 @@ class TeluguDataProcessor:
             if not questions:
                 raise ValueError("Dataset does not contain valid 'questions' data")
             
+
+            sample_ratio = self.config.get("data_sample_ratio", 1.0)
+            if 0.0 < sample_ratio < 1.0:
+                # Calculate sample size
+                sample_size = int(len(questions) * sample_ratio)
+                # Randomly sample the data
+                random.seed(self.config["seed"])
+                questions = random.sample(questions, sample_size)
+                logger.info(f"Sampled {sample_size} examples ({sample_ratio*100:.1f}%) from {len(questions)} total examples")
+            
             logger.info(f"Loaded {len(questions)} examples from dataset")
             
             # Process data in a simple format
