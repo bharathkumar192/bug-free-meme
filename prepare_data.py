@@ -43,19 +43,27 @@ class DataPreparator:
         if self.input_file.endswith('.json'):
             with open(self.input_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+                # Check if data has the 'questions' key
+                if 'questions' in data:
+                    questions = data['questions']
+                    logger.info(f"Found {len(questions)} question-answer pairs")
+                    return questions
+                else:
+                    logger.warning("Data does not have 'questions' key")
+                    return []
         elif self.input_file.endswith('.csv'):
             data = pd.read_csv(self.input_file).to_dict('records')
+            return data
         else:
             raise ValueError(f"Unsupported file format: {self.input_file}")
-            
-        return data
     
     def clean_text(self, text: str) -> str:
         """Clean and normalize text"""
+        if not isinstance(text, str):
+            return ""
+        
         # Remove extra whitespace
         text = re.sub(r'\s+', ' ', text)
-        # Remove special characters but keep basic punctuation
-        text = re.sub(r'[^\w\s.,!?-]', '', text)
         # Normalize quotes
         text = text.replace('"', '"').replace('"', '"')
         text = text.replace(''', "'").replace(''', "'")
@@ -63,92 +71,142 @@ class DataPreparator:
     
     def validate_text(self, text: str) -> bool:
         """Validate text meets quality criteria"""
+        if not isinstance(text, str):
+            return False
+            
         if len(text) < self.min_length:
             return False
         if len(text) > self.max_length:
             return False
         # Check for minimum word count
-        if len(text.split()) < 10:
-            return False
-        # Check for basic sentence structure
-        if not re.search(r'[.!?]', text):
+        if len(text.split()) < 5:  # Reduced to 5 from 10
             return False
         return True
     
     def process_data(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Process and clean the data"""
+        """Process raw data into training format for question-answer pairs"""
         processed_data = []
         
         for item in tqdm(data, desc="Processing data"):
-            if isinstance(item, dict):
-                text = item.get('text', '')
-            else:
-                text = str(item)
+            # Skip if required fields are missing
+            if 'question' not in item or 'response' not in item:
+                continue
                 
-            text = self.clean_text(text)
+            question = self.clean_text(item['question'])
+            response = self.clean_text(item['response'])
             
-            if self.validate_text(text):
+            # Skip if either question or response doesn't pass validation
+            if not self.validate_text(question) or not self.validate_text(response):
+                continue
+            
+            # Use chat template format
+            if self.config.model.use_chat_template:
+                messages = [
+                    {"role": "user", "content": question},
+                    {"role": "assistant", "content": response}
+                ]
                 processed_data.append({
-                    'text': text,
-                    'length': len(text),
-                    'word_count': len(text.split())
+                    "messages": messages,
+                    "q_length": len(question),
+                    "r_length": len(response),
                 })
-                
+            else:
+                # Standard format if not using chat template
+                processed_data.append({
+                    'question': question,
+                    'response': response,
+                    'q_length': len(question),
+                    'r_length': len(response),
+                })
+        
+        logger.info(f"Processed {len(processed_data)} valid examples")
         return processed_data
     
     def create_splits(self, data: List[Dict[str, Any]]) -> Dict[str, Dataset]:
         """Create train/validation/test splits"""
+        # Return empty datasets if no data
+        if not data:
+            empty_dataset = Dataset.from_list([])
+            return {
+                'train': empty_dataset,
+                'validation': empty_dataset,
+                'test': empty_dataset
+            }
+            
         # Ensure deterministic results
         np.random.seed(self.config.integration.seed)
         
         # Shuffle data
-        np.random.shuffle(data)
+        shuffled_data = data.copy()
+        np.random.shuffle(shuffled_data)
         
         # Calculate split sizes
-        total_size = len(data)
+        total_size = len(shuffled_data)
         train_size = int(total_size * self.train_ratio)
         val_size = int(total_size * self.val_ratio)
         
-        # Create splits
-        splits = {
-            'train': data[:train_size],
-            'validation': data[train_size:train_size + val_size],
-            'test': data[train_size + val_size:]
-        }
+        # Split the data
+        train_data = shuffled_data[:train_size]
+        val_data = shuffled_data[train_size:train_size + val_size]
+        test_data = shuffled_data[train_size + val_size:]
         
         # Convert to HuggingFace datasets
         datasets = {}
-        for split_name, split_data in splits.items():
-            datasets[split_name] = Dataset.from_list(split_data)
+        datasets['train'] = Dataset.from_list(train_data)
+        datasets['validation'] = Dataset.from_list(val_data) 
+        datasets['test'] = Dataset.from_list(test_data)
             
         return datasets
     
     def save_datasets(self, datasets: Dict[str, Dataset]):
         """Save processed datasets"""
         for split_name, dataset in datasets.items():
-            output_file = self.output_dir / f"{split_name}.json"
-            dataset.to_json(output_file)
-            logger.info(f"Saved {split_name} split to {output_file}")
-            
+            if len(dataset) > 0:  # Only save non-empty datasets
+                output_file = self.output_dir / f"{split_name}.json"
+                dataset.to_json(output_file)
+                logger.info(f"Saved {split_name} split with {len(dataset)} examples to {output_file}")
+    
     def generate_statistics(self, datasets: Dict[str, Dataset]) -> Dict[str, Any]:
         """Generate dataset statistics"""
         stats = {}
         
         for split_name, dataset in datasets.items():
-            lengths = [item['length'] for item in dataset]
-            word_counts = [item['word_count'] for item in dataset]
-            
-            stats[split_name] = {
-                'num_examples': len(dataset),
-                'avg_length': np.mean(lengths),
-                'std_length': np.std(lengths),
-                'min_length': np.min(lengths),
-                'max_length': np.max(lengths),
-                'avg_word_count': np.mean(word_counts),
-                'std_word_count': np.std(word_counts),
-                'min_word_count': np.min(word_counts),
-                'max_word_count': np.max(word_counts)
-            }
+            if len(dataset) == 0:
+                stats[split_name] = {
+                    'num_examples': 0,
+                    'note': 'Empty dataset'
+                }
+                continue
+                
+            # Check if we're using chat template
+            if 'messages' in dataset[0]:
+                # For chat template format
+                q_lengths = [item['q_length'] for item in dataset]
+                r_lengths = [item['r_length'] for item in dataset]
+                
+                stats[split_name] = {
+                    'num_examples': len(dataset),
+                    'avg_question_length': float(np.mean(q_lengths)),
+                    'avg_response_length': float(np.mean(r_lengths)),
+                    'min_question_length': int(np.min(q_lengths)),
+                    'max_question_length': int(np.max(q_lengths)),
+                    'min_response_length': int(np.min(r_lengths)),
+                    'max_response_length': int(np.max(r_lengths)),
+                }
+            else:
+                # For standard format
+                q_lengths = [len(item['question']) for item in dataset]
+                r_lengths = [len(item['response']) for item in dataset]
+                
+                stats[split_name] = {
+                    'num_examples': len(dataset),
+                    'avg_question_length': float(np.mean(q_lengths)),
+                    'avg_response_length': float(np.mean(r_lengths)),
+                    'min_question_length': int(np.min(q_lengths)),
+                    'max_question_length': int(np.max(q_lengths)),
+                    'min_response_length': int(np.min(r_lengths)),
+                    'max_response_length': int(np.max(r_lengths)),
+                }
             
         return stats
     
@@ -164,12 +222,16 @@ class DataPreparator:
         try:
             # Load data
             data = self.load_data()
-            logger.info(f"Loaded {len(data)} examples")
-            
+            if not data:
+                logger.error("No data loaded or empty dataset")
+                return
+                
             # Process data
             processed_data = self.process_data(data)
-            logger.info(f"Processed {len(processed_data)} examples")
-            
+            if not processed_data:
+                logger.error("No examples passed validation")
+                return
+                
             # Create splits
             datasets = self.create_splits(processed_data)
             
