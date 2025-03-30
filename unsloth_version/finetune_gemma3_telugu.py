@@ -10,19 +10,16 @@ import random
 import numpy as np
 import argparse
 from pathlib import Path
-from unsloth.chat_templates import get_chat_template, train_on_responses_only, standardize_data_formats
-# from trl import SFTTrainer
-from transformers import Trainer, DataCollatorForLanguageModeling
-from datasets import Dataset
+from unsloth.chat_templates import get_chat_template
 from transformers import (
     AutoModelForCausalLM, 
     AutoTokenizer,
     TrainingArguments, 
     EarlyStoppingCallback,
-    # Trainer,
-    # AutoProcessor, 
-    # Gemma3ForConditionalGeneration
+    Trainer,
+    DataCollatorForLanguageModeling
 )
+from datasets import Dataset
 
 # Load configuration
 from config_loader import load_config
@@ -55,7 +52,7 @@ class TeluguDataProcessor:
         self.tokenizer = tokenizer
     
     def load_and_process_data(self):
-        """Load and process the Telugu dataset more efficiently"""
+        """Load and process the Telugu dataset"""
         logger.info(f"Loading dataset from {self.config['input_file']}")
         
         try:
@@ -86,22 +83,19 @@ class TeluguDataProcessor:
             dataset = Dataset.from_list(processed_data)
             logger.info(f"Processed {len(dataset)} valid examples")
             
-            # Standardize the format first (this helps with compatibility)
-            # dataset = standardize_data_formats(dataset)
-            
             if self.config["eval_split"] > 0:
                 split = dataset.train_test_split(test_size=self.config["eval_split"], seed=self.config["seed"])
                 train_dataset, eval_dataset = split["train"], split["test"]
             else:
                 train_dataset, eval_dataset = dataset, None
             
-            # Apply chat template in a single mapping operation - ensuring string outputs
+            # Apply chat template in a single mapping operation
             def apply_template(examples):
-                result = {"text": [self.tokenizer.apply_chat_template(conv) for conv in examples["conversations"]]}
-                # Ensure all values are strings to avoid 'int' has no attribute 'startswith' error
-                # if type(result["text"]) != str:
-                #     print("found it")
-                return result
+                texts = []
+                for conv in examples["conversations"]:
+                    text = self.tokenizer.apply_chat_template(conv)
+                    texts.append(text)
+                return {"text": texts}
             
             train_dataset = train_dataset.map(
                 apply_template, 
@@ -123,27 +117,52 @@ class TeluguDataProcessor:
             logger.error(f"Error processing dataset: {str(e)}")
             raise
 
-
 def tokenize_dataset(dataset, tokenizer, max_length):
+    """Tokenize dataset for the model"""
+    def debug_example(example):
+        """Helper function to debug dataset format"""
+        print(f"Example keys: {example.keys()}")
+        print(f"Text type: {type(example['text'])}")
+        if isinstance(example['text'], list):
+            print(f"Text is a list of length {len(example['text'])}")
+            if len(example['text']) > 0:
+                print(f"First item type: {type(example['text'][0])}")
+                print(f"First item sample: {example['text'][0][:100]}...")
+        else:
+            print(f"Text sample: {example['text'][:100]}...")
+        return example
+    
+    # Debug the first example
+    if len(dataset) > 0:
+        _ = debug_example(dataset[0])
+    
     def tokenize_function(examples):
-        # Your dataset has 'text' column with the chat-templated conversations
+        # Handle different text formats
+        texts = examples["text"]
+        if not isinstance(texts[0], str):
+            logger.warning(f"Text is not a string! Type: {type(texts[0])}")
+            # Convert to string if needed
+            texts = [str(text) for text in texts]
+        
         inputs = tokenizer(
-            examples["text"],
+            texts,
             padding="max_length",
             truncation=True,
             max_length=max_length,
             return_tensors="pt"
         )
-        # Set the labels to be the same as input_ids for causal language modeling
-        inputs["labels"] = inputs["input_ids"].copy()
+        
+        # Set labels equal to input_ids for causal language modeling
+        inputs["labels"] = inputs["input_ids"].clone()
         return inputs
     
-    # Apply tokenization to the dataset
+    # Apply tokenization
     tokenized_dataset = dataset.map(
         tokenize_function,
         batched=True,
-        remove_columns=["conversations", "text"]  # Remove original columns
+        remove_columns=dataset.column_names  # Remove all original columns
     )
+    
     return tokenized_dataset
 
 class TeluguFineTuner:
@@ -210,7 +229,6 @@ class TeluguFineTuner:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             
             # Load model
-            # self.model = Gemma3ForConditionalGeneration.from_pretrained(
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.config["model_name"],
                 device_map="auto",
@@ -220,7 +238,7 @@ class TeluguFineTuner:
             )
             
             # Enable gradient checkpointing for memory efficiency
-            if self.model.supports_gradient_checkpointing:
+            if hasattr(self.model, "gradient_checkpointing_enable"):
                 self.model.gradient_checkpointing_enable()
             
             # Apply Gemma-3 chat template
@@ -240,7 +258,7 @@ class TeluguFineTuner:
             logger.info(f"Trainable parameters: {trainable_params:.2f}B ({100 * trainable_params / total_params:.2f}%)")
             
         except Exception as e:
-            logger.error(f"Error loading model or tokenizer with standard HuggingFace: {str(e)}")
+            logger.error(f"Error loading model or tokenizer: {str(e)}")
             raise
             
     def train(self):
@@ -251,10 +269,12 @@ class TeluguFineTuner:
             # Load and process the data
             train_dataset, eval_dataset = self.data_processor.load_and_process_data()
             
-            # Add unsloth performance info
-            logger.info("Using Unsloth for faster training")
+            # Tokenize the datasets
+            logger.info("Tokenizing datasets...")
+            train_dataset = tokenize_dataset(train_dataset, self.tokenizer, self.config["max_seq_length"])
+            if eval_dataset:
+                eval_dataset = tokenize_dataset(eval_dataset, self.tokenizer, self.config["max_seq_length"])
             
-
             # Configure training arguments
             training_args = TrainingArguments(
                 output_dir=self.config["output_dir"],
@@ -289,33 +309,11 @@ class TeluguFineTuner:
             )
             
             # Define training process for full supervised fine-tuning
-            logger.info("Initializing SFT trainer for full supervised fine-tuning")
+            logger.info("Initializing standard Trainer for full supervised fine-tuning")
             
-            # Initialize SFT trainer
-            # trainer = SFTTrainer(
-            #     model=self.model,
-            #     tokenizer=self.tokenizer,
-            #     train_dataset=train_dataset,
-            #     eval_dataset=eval_dataset,
-            #     args=training_args,
-            #     dataset_text_field="text",
-            #     max_seq_length=self.config["max_seq_length"],
-            #     callbacks=[
-            #         EarlyStoppingCallback(
-            #             early_stopping_patience=self.config["early_stopping_patience"]
-            #         )
-            #     ] if eval_dataset else None,
-            # )
-
-
-            train_dataset = tokenize_dataset(train_dataset, self.tokenizer, self.config["max_seq_length"])
-            if eval_dataset:
-                eval_dataset = tokenize_dataset(eval_dataset, self.tokenizer, self.config["max_seq_length"])
-
-
+            # Initialize standard Trainer
             trainer = Trainer(
                 model=self.model,
-                tokenizer=self.tokenizer,
                 args=training_args,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
@@ -329,19 +327,6 @@ class TeluguFineTuner:
                     )
                 ] if eval_dataset else None,
             )
-            
-            # Apply train-on-responses-only optimization if requested
-            if self.config["train_on_responses_only"]:
-                try:
-                    logger.info("Applying train-on-responses-only optimization")
-                    trainer = train_on_responses_only(
-                        trainer,
-                        instruction_part="<start_of_turn>user\n",
-                        response_part="<start_of_turn>model\n",
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to apply train-on-responses-only: {e}")
-                    logger.warning("Proceeding with regular training")
             
             # Start training
             logger.info("Starting full supervised fine-tuning...")
