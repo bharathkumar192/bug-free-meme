@@ -195,8 +195,9 @@ class TeluguFineTuner:
                 torch_dtype=torch.bfloat16,
                 trust_remote_code=True,
                 token=self.config.get("hf_token", None),
+                low_cpu_mem_usage=True,
             )
-            
+            self.model.gradient_checkpointing_enable()
             # Enable gradient checkpointing for memory efficiency
             if hasattr(self.model, "gradient_checkpointing_enable"):
                 self.model.gradient_checkpointing_enable()
@@ -259,6 +260,7 @@ class TeluguFineTuner:
                 seed=self.config["seed"],
                 group_by_length=True,
                 ddp_find_unused_parameters=False,
+                deepspeed="ds_config.json",
             )
             
             # Define training process for full supervised fine-tuning
