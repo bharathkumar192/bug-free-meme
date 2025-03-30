@@ -76,8 +76,10 @@ setup_virtualenv() {
   if [ ! -d "$VENV_DIR" ]; then
     echo -e "${BLUE}Creating virtual environment at $VENV_DIR...${NC}"
     virtualenv "$VENV_DIR"
+    source llm_env/bin/activate
   else
     echo -e "${GREEN}Using existing virtual environment at $VENV_DIR${NC}"
+    source llm_env/bin/activate
   fi
   
   # Activate virtual environment
@@ -257,7 +259,7 @@ check_disk_space() {
 # set -e
 
 # Activate virtual environment
-source llm_env/bin/activate
+# source llm_env/bin/activate
 
 # # Step 1: Prepare data
 # echo "Step 1: Preparing data..."
