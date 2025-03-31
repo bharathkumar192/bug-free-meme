@@ -9,11 +9,11 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Default values
-MODEL_ID=""
-HF_TOKEN=""
+MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu"
+HF_TOKEN="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"
 PROMPT=""
 PROMPT_FILE=""
-OUTPUT_FILE="results.json"
+OUTPUT_FILE="tests_results.json"
 MAX_NEW_TOKENS=512
 TEMPERATURE=0.7
 TOP_P=0.95
