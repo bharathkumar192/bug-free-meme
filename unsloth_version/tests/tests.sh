@@ -8,6 +8,18 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Check if the inference.py script exists
+if [ ! -f "inference.py" ]; then
+  echo -e "${RED}Error: inference.py script not found in the current directory${NC}"
+  exit 1
+fi
+
+# Check if unsloth is installed
+if ! pip list | grep -q unsloth; then
+  echo -e "${YELLOW}Warning: unsloth package is not installed. Installing now...${NC}"
+  pip install unsloth
+fi
+
 # Default values
 MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu"
 HF_TOKEN="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"
@@ -19,6 +31,7 @@ TEMPERATURE=0.7
 TOP_P=0.95
 TOP_K=50
 USE_CHAT_TEMPLATE=false
+QUESTION_PROMPT=false
 DEVICE="auto"
 
 # Function to display usage
@@ -36,6 +49,7 @@ usage() {
   echo "  --top_p N                 Top-p sampling parameter (default: 0.95)"
   echo "  --top_k N                 Top-k sampling parameter (default: 50)"
   echo "  --use_chat_template       Use the model's chat template for generation"
+  echo "  --question_prompt        Format prompt as 'Question: X\\nAnswer:' (for non-chat inference)"
   echo "  --device TYPE             Device to run inference on (auto, cpu, cuda) (default: auto)"
   echo "  --help                    Display this help message"
   echo ""
@@ -85,6 +99,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --use_chat_template)
       USE_CHAT_TEMPLATE=true
+      shift
+      ;;
+    --question_prompt)
+      QUESTION_PROMPT=true
       shift
       ;;
     --device)
@@ -145,6 +163,10 @@ CMD="$CMD --device $DEVICE"
 
 if [ "$USE_CHAT_TEMPLATE" = true ]; then
   CMD="$CMD --use_chat_template"
+fi
+
+if [ "$QUESTION_PROMPT" = true ]; then
+  CMD="$CMD --question_prompt"
 fi
 
 # Print the command

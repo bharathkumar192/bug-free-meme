@@ -1,3 +1,4 @@
+import unsloth  # Import unsloth first to apply all optimizations
 import torch
 import argparse
 import logging
@@ -31,7 +32,18 @@ class ModelInference:
         top_k: int = 50,
         device: str = "auto",
     ):
-
+        """
+        Initialize the inference class with model and generation parameters
+        
+        Args:
+            model_id (str): Hugging Face model ID or local path
+            hf_token (str): Hugging Face token for accessing private repositories
+            max_new_tokens (int): Maximum number of tokens to generate
+            temperature (float): Temperature for sampling
+            top_p (float): Top-p sampling parameter
+            top_k (int): Top-k sampling parameter
+            device (str): Device to run inference on ('cpu', 'cuda', 'auto')
+        """
         self.model_id = model_id
         self.hf_token = hf_token
         
@@ -81,8 +93,8 @@ class ModelInference:
             
             # Determine data type based on device
             if self.device == "cuda":
-                torch_dtype = torch.float16  # Use fp16 for GPU
-                logger.info("Using float16 precision for CUDA device")
+                torch_dtype = torch.bfloat16  # Use bfloat16 for GPU (not fp16/float16)
+                logger.info("Using bfloat16 precision for CUDA device")
             else:
                 torch_dtype = torch.float32
                 logger.info("Using float32 precision for CPU device")
@@ -148,38 +160,27 @@ class ModelInference:
                 "eos_token_id": self.tokenizer.eos_token_id,
             }
             
-            try:
-                # First try using the pipeline approach
-                output = self.generator(
-                    prompt,
-                    **generation_config
-                )
-                
-                # Extract generated text
-                generated_text = output[0]["generated_text"]
-                
-                # Remove the original prompt from output if needed
-                response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
-                
-            except Exception as e:
-                logger.warning(f"Pipeline generation failed: {e}. Falling back to direct model generation")
-                
-                # Fall back to direct model generation if pipeline fails
-                inputs = self.tokenizer(prompt, return_tensors="pt")
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                
-                # Generate
-                with torch.no_grad():
-                    output = self.model.generate(
-                        **inputs,
+            # Try using the pipeline if available
+            if self.generator is not None:
+                try:
+                    # Generate text using pipeline
+                    output = self.generator(
+                        prompt,
                         **generation_config
                     )
-                
-                # Decode the output
-                generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
-                
-                # Remove the original prompt from output if needed
-                response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
+                    
+                    # Extract generated text
+                    generated_text = output[0]["generated_text"]
+                    
+                    # Remove the original prompt from output if needed
+                    response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
+                    
+                except Exception as e:
+                    logger.warning(f"Pipeline generation failed: {e}. Falling back to direct model generation")
+                    response = self._generate_directly(prompt, generation_config)
+            else:
+                # Direct generation if pipeline is not available
+                response = self._generate_directly(prompt, generation_config)
             
             end_time = time.time()
             generation_time = end_time - start_time
@@ -192,6 +193,39 @@ class ModelInference:
         except Exception as e:
             logger.error(f"Error during text generation: {str(e)}")
             return f"Error: {str(e)}"
+    
+    def _generate_directly(self, prompt: str, generation_config: Dict[str, Any]) -> str:
+        """
+        Directly generate text using the model without the pipeline
+        
+        Args:
+            prompt (str): Input prompt
+            generation_config (Dict[str, Any]): Generation parameters
+            
+        Returns:
+            str: Generated text
+        """
+        # Tokenize the input
+        inputs = self.tokenizer(prompt, return_tensors="pt")
+        
+        # Move inputs to the same device as the model
+        device = next(self.model.parameters()).device
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        
+        # Generate
+        with torch.no_grad():
+            output = self.model.generate(
+                **inputs,
+                **generation_config
+            )
+        
+        # Decode the output
+        generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
+        
+        # Remove the original prompt from output if needed
+        response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
+        
+        return response
     
     def generate_with_chat_template(self, user_message: str) -> str:
         """
