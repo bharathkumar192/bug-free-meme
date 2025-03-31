@@ -7,6 +7,7 @@ import os
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from huggingface_hub import login
 from typing import List, Dict, Any, Optional
+from unsloth.chat_templates import get_chat_template
 
 # Configure logging
 logging.basicConfig(
@@ -30,18 +31,7 @@ class ModelInference:
         top_k: int = 50,
         device: str = "auto",
     ):
-        """
-        Initialize the inference class with model and generation parameters
-        
-        Args:
-            model_id (str): Hugging Face model ID or local path
-            hf_token (str): Hugging Face token for accessing private repositories
-            max_new_tokens (int): Maximum number of tokens to generate
-            temperature (float): Temperature for sampling
-            top_p (float): Top-p sampling parameter
-            top_k (int): Top-k sampling parameter
-            device (str): Device to run inference on ('cpu', 'cuda', 'auto')
-        """
+
         self.model_id = model_id
         self.hf_token = hf_token
         
@@ -71,7 +61,7 @@ class ModelInference:
             logger.info(f"Loading tokenizer from {self.model_id}")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.model_id,
-                use_auth_token=self.hf_token,
+                token=self.hf_token,
                 trust_remote_code=True,
                 padding_side="right",
             )
@@ -80,6 +70,14 @@ class ModelInference:
             if self.tokenizer.pad_token is None:
                 logger.info("Setting pad_token to eos_token")
                 self.tokenizer.pad_token = self.tokenizer.eos_token
+                
+            # Apply Gemma-3 chat template if needed
+            if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template is None:
+                logger.info("Applying Gemma-3 chat template")
+                self.tokenizer = get_chat_template(
+                    self.tokenizer,
+                    chat_template="gemma-3"
+                )
             
             # Determine data type based on device
             if self.device == "cuda":
@@ -93,20 +91,26 @@ class ModelInference:
             logger.info(f"Loading model from {self.model_id}")
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_id,
-                use_auth_token=self.hf_token,
+                token=self.hf_token,
                 trust_remote_code=True,
                 torch_dtype=torch_dtype,
-                device_map=self.device if self.device != "cpu" else None,
-                use_cache=True,
+                device_map="auto" if self.device == "cuda" else None,
+                low_cpu_mem_usage=True,
+                # use_cache=True,
             )
             
             # Create text generation pipeline
-            self.generator = pipeline(
-                "text-generation",
-                model=self.model,
-                tokenizer=self.tokenizer,
-                device=0 if self.device == "cuda" else -1,
-            )
+            try:
+                self.generator = pipeline(
+                    "text-generation",
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    device=0 if self.device == "cuda" else -1,
+                )
+                logger.info("Text generation pipeline created successfully")
+            except Exception as e:
+                logger.warning(f"Could not create text generation pipeline: {e}")
+                logger.info("Will fall back to direct model generation")
             
             logger.info(f"Model loaded successfully on {self.device}")
             
@@ -144,21 +148,42 @@ class ModelInference:
                 "eos_token_id": self.tokenizer.eos_token_id,
             }
             
-            # Generate text
-            output = self.generator(
-                prompt,
-                **generation_config
-            )
-            
-            # Extract generated text
-            generated_text = output[0]["generated_text"]
-            
-            # Remove the original prompt from output if needed
-            response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
+            try:
+                # First try using the pipeline approach
+                output = self.generator(
+                    prompt,
+                    **generation_config
+                )
+                
+                # Extract generated text
+                generated_text = output[0]["generated_text"]
+                
+                # Remove the original prompt from output if needed
+                response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
+                
+            except Exception as e:
+                logger.warning(f"Pipeline generation failed: {e}. Falling back to direct model generation")
+                
+                # Fall back to direct model generation if pipeline fails
+                inputs = self.tokenizer(prompt, return_tensors="pt")
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                
+                # Generate
+                with torch.no_grad():
+                    output = self.model.generate(
+                        **inputs,
+                        **generation_config
+                    )
+                
+                # Decode the output
+                generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
+                
+                # Remove the original prompt from output if needed
+                response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
             
             end_time = time.time()
             generation_time = end_time - start_time
-            tokens_per_second = self.max_new_tokens / generation_time
+            tokens_per_second = self.max_new_tokens / generation_time if generation_time > 0 else 0
             
             logger.info(f"Text generated in {generation_time:.2f}s ({tokens_per_second:.2f} tokens/s)")
             
@@ -198,6 +223,12 @@ class ModelInference:
             
             # Generate response
             response = self.generate(prompt)
+            
+            # Remove the system message if present in the response
+            if "<start_of_turn>model" in response:
+                response = response.split("<start_of_turn>model")[1].strip()
+            if "<end_of_turn>" in response:
+                response = response.split("<end_of_turn>")[0].strip()
             
             return response
         
@@ -291,6 +322,9 @@ def main():
     # Authentication
     parser.add_argument("--hf_token", type=str, default=None,
                         help="Hugging Face token for accessing private repositories")
+    parser.add_argument("--question_prompt", type=str, 
+                        default=None,
+                        help="Question prompt to append to each prompt (for 'Question: X Answer:' format)")
     
     args = parser.parse_args()
     
@@ -316,10 +350,15 @@ def main():
     
     # Single prompt generation
     if args.prompt is not None:
+        # Apply question format if needed
+        prompt = args.prompt
+        if args.question_prompt and not args.use_chat_template:
+            prompt = f"Question: {args.prompt}\nAnswer:"
+            
         if args.use_chat_template:
             response = inference.generate_with_chat_template(args.prompt)
         else:
-            response = inference.generate(args.prompt)
+            response = inference.generate(prompt)
             
         print("\nGenerated Text:")
         print("-" * 40)
@@ -349,8 +388,14 @@ def main():
                 
             logger.info(f"Loaded {len(prompts)} prompts from {args.prompt_file}")
             
-            # Generate responses
-            responses = inference.generate_batch(prompts, args.use_chat_template)
+            # Apply question format if needed
+            if args.question_prompt and not args.use_chat_template:
+                formatted_prompts = [f"Question: {p}\nAnswer:" for p in prompts]
+                # Generate responses with formatted prompts
+                responses = inference.generate_batch(formatted_prompts, args.use_chat_template)
+            else:
+                # Generate responses with original prompts
+                responses = inference.generate_batch(prompts, args.use_chat_template)
             
             # Save results
             inference.save_to_json(prompts, responses, args.output_file)
