@@ -9,8 +9,8 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Check if the inference.py script exists
-if [ ! -f "inference.py" ]; then
-  echo -e "${RED}Error: inference.py script not found in the current directory${NC}"
+if [ ! -f "inference_tests.py" ]; then
+  echo -e "${RED}Error: inference_tests.py script not found in the current directory${NC}"
   exit 1
 fi
 
