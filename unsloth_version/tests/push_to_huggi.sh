@@ -13,9 +13,9 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Default values
-HF_TOKEN=""
-REPO_ID=""
-FILES=""
+HF_TOKEN="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"
+REPO_ID="bharathkumar1922001/gemma-3-12b-telugu"
+FILES="tests_results.json, inference.log"
 REPO_TYPE="model"  # Default repo type
 
 # Function to display usage
