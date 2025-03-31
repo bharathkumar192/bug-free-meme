@@ -122,7 +122,7 @@ if [ -z "$HF_TOKEN" ]; then
 fi
 
 # Build the command
-CMD="python inference.py --model_id \"$MODEL_ID\""
+CMD="python inference_tests.py --model_id \"$MODEL_ID\""
 
 if [ ! -z "$HF_TOKEN" ]; then
   CMD="$CMD --hf_token \"$HF_TOKEN\""
