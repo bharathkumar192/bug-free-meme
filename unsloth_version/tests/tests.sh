@@ -8,6 +8,11 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+
+apt-get update && apt-get install -y git-lfs
+git lfs install
+git lfs pull
+
 # Check if the inference.py script exists
 if [ ! -f "inference_tests.py" ]; then
   echo -e "${RED}Error: inference_tests.py script not found in the current directory${NC}"
@@ -142,6 +147,8 @@ fi
 # Build the command
 CMD="python inference_tests.py --model_id \"$MODEL_ID\""
 
+
+
 if [ ! -z "$HF_TOKEN" ]; then
   CMD="$CMD --hf_token \"$HF_TOKEN\""
 fi
@@ -176,6 +183,8 @@ echo ""
 
 # Execute the command
 eval $CMD
+
+
 
 # Check if the command was successful
 if [ $? -eq 0 ]; then
