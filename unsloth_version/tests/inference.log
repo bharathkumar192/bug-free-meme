@@ -1,0 +1,138 @@
+2025-03-31 00:36:21,056 - INFO - Logging in to Hugging Face Hub with provided token
+2025-03-31 00:36:21,245 - INFO - Loading tokenizer from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:36:24,600 - INFO - Using float16 precision for CUDA device
+2025-03-31 00:36:24,600 - INFO - Loading model from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:38:00,858 - ERROR - Error initializing model: Gemma3ForConditionalGeneration.__init__() got an unexpected keyword argument 'use_cache'
+2025-03-31 00:46:15,531 - INFO - Logging in to Hugging Face Hub with provided token
+2025-03-31 00:46:15,656 - INFO - Loading tokenizer from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:46:16,904 - INFO - Using float16 precision for CUDA device
+2025-03-31 00:46:16,904 - INFO - Loading model from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:46:17,324 - INFO - We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2025-03-31 00:46:22,628 - WARNING - Could not create text generation pipeline: The model has been loaded with `accelerate` and therefore cannot be moved to a specific device. Please discard the `device` argument when creating your pipeline object.
+2025-03-31 00:46:22,628 - INFO - Will fall back to direct model generation
+2025-03-31 00:46:22,628 - INFO - Model loaded successfully on cuda
+2025-03-31 00:46:22,630 - INFO - Model size: 12.19B parameters
+2025-03-31 00:46:22,630 - ERROR - Error processing prompt file: Expecting value: line 1 column 1 (char 0)
+2025-03-31 00:50:42,408 - INFO - Logging in to Hugging Face Hub with provided token
+2025-03-31 00:50:42,471 - INFO - Loading tokenizer from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:50:43,672 - INFO - Using float16 precision for CUDA device
+2025-03-31 00:50:43,673 - INFO - Loading model from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:50:44,015 - INFO - We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2025-03-31 00:50:48,501 - WARNING - Could not create text generation pipeline: The model has been loaded with `accelerate` and therefore cannot be moved to a specific device. Please discard the `device` argument when creating your pipeline object.
+2025-03-31 00:50:48,502 - INFO - Will fall back to direct model generation
+2025-03-31 00:50:48,502 - INFO - Model loaded successfully on cuda
+2025-03-31 00:50:48,503 - INFO - Model size: 12.19B parameters
+2025-03-31 00:50:48,503 - INFO - Loaded 10 prompts from prompts.json
+2025-03-31 00:50:48,504 - INFO - Processing prompt 1/10
+2025-03-31 00:50:48,504 - INFO - Generating text for prompt (first 50 chars): ఇండియాలో గ్రోసరీస్ మీద డబ్బులు సేవ్ చేయడానికి బెస్...
+2025-03-31 00:50:48,504 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,779 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,779 - INFO - Processing prompt 2/10
+2025-03-31 00:50:48,779 - INFO - Generating text for prompt (first 50 chars): హైదరాబాద్‌లో మంచి ఫుడ్ ప్లేసెస్ ఏవి?...
+2025-03-31 00:50:48,779 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,782 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,783 - INFO - Processing prompt 3/10
+2025-03-31 00:50:48,783 - INFO - Generating text for prompt (first 50 chars): తెలుగులో పాపులర్ సినిమాలు ఏంటి?...
+2025-03-31 00:50:48,783 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,786 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,786 - INFO - Processing prompt 4/10
+2025-03-31 00:50:48,786 - INFO - Generating text for prompt (first 50 chars): కృష్ణా నది గురించి చెప్పండి...
+2025-03-31 00:50:48,786 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,789 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,789 - INFO - Processing prompt 5/10
+2025-03-31 00:50:48,789 - INFO - Generating text for prompt (first 50 chars): అమెరికాలో చదవడానికి మంచి యూనివర్సిటీలు ఏవి?...
+2025-03-31 00:50:48,789 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,792 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,792 - INFO - Processing prompt 6/10
+2025-03-31 00:50:48,792 - INFO - Generating text for prompt (first 50 chars): ఆరోగ్యకరమైన జీవన శైలి కోసం టిప్స్ ఏమిటి?...
+2025-03-31 00:50:48,792 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,795 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,795 - INFO - Processing prompt 7/10
+2025-03-31 00:50:48,795 - INFO - Generating text for prompt (first 50 chars): తెలుగులో ప్రోగ్రామింగ్ నేర్చుకోవడం ఎలా?...
+2025-03-31 00:50:48,796 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,798 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,798 - INFO - Processing prompt 8/10
+2025-03-31 00:50:48,798 - INFO - Generating text for prompt (first 50 chars): ఇండియాలో టూరిస్ట్ ప్లేసెస్ ఏంటి?...
+2025-03-31 00:50:48,798 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,801 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,801 - INFO - Processing prompt 9/10
+2025-03-31 00:50:48,801 - INFO - Generating text for prompt (first 50 chars): తెలుగు సాహిత్యం గురించి చెప్పండి...
+2025-03-31 00:50:48,801 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,804 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,804 - INFO - Processing prompt 10/10
+2025-03-31 00:50:48,804 - INFO - Generating text for prompt (first 50 chars): వర్క్-లైఫ్ బ్యాలెన్స్ మెయింటైన్ చేయడం ఎలా?...
+2025-03-31 00:50:48,804 - WARNING - Pipeline generation failed: 'ModelInference' object has no attribute 'generator'. Falling back to direct model generation
+2025-03-31 00:50:48,807 - ERROR - Error during text generation: expected mat1 and mat2 to have the same dtype, but got: c10::BFloat16 != c10::Half
+2025-03-31 00:50:48,808 - INFO - Results saved to tests_results.json
+2025-03-31 00:56:24,011 - INFO - Logging in to Hugging Face Hub with provided token
+2025-03-31 00:56:24,169 - INFO - Loading tokenizer from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:56:25,290 - INFO - Using bfloat16 precision for CUDA device
+2025-03-31 00:56:25,290 - INFO - Loading model from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 00:56:25,418 - INFO - We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2025-03-31 00:56:29,763 - WARNING - Could not create text generation pipeline: The model has been loaded with `accelerate` and therefore cannot be moved to a specific device. Please discard the `device` argument when creating your pipeline object.
+2025-03-31 00:56:29,763 - INFO - Will fall back to direct model generation
+2025-03-31 00:56:29,763 - INFO - Model loaded successfully on cuda
+2025-03-31 00:56:29,765 - INFO - Model size: 12.19B parameters
+2025-03-31 00:56:29,765 - INFO - Loaded 10 prompts from prompts.json
+2025-03-31 00:56:29,765 - INFO - Processing prompt 1/10
+2025-03-31 00:56:29,765 - INFO - Generating text for prompt (first 50 chars): ఇండియాలో గ్రోసరీస్ మీద డబ్బులు సేవ్ చేయడానికి బెస్...
+2025-03-31 00:56:29,765 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,765 - INFO - Processing prompt 2/10
+2025-03-31 00:56:29,765 - INFO - Generating text for prompt (first 50 chars): హైదరాబాద్‌లో మంచి ఫుడ్ ప్లేసెస్ ఏవి?...
+2025-03-31 00:56:29,765 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,765 - INFO - Processing prompt 3/10
+2025-03-31 00:56:29,765 - INFO - Generating text for prompt (first 50 chars): తెలుగులో పాపులర్ సినిమాలు ఏంటి?...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Processing prompt 4/10
+2025-03-31 00:56:29,766 - INFO - Generating text for prompt (first 50 chars): కృష్ణా నది గురించి చెప్పండి...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Processing prompt 5/10
+2025-03-31 00:56:29,766 - INFO - Generating text for prompt (first 50 chars): అమెరికాలో చదవడానికి మంచి యూనివర్సిటీలు ఏవి?...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Processing prompt 6/10
+2025-03-31 00:56:29,766 - INFO - Generating text for prompt (first 50 chars): ఆరోగ్యకరమైన జీవన శైలి కోసం టిప్స్ ఏమిటి?...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Processing prompt 7/10
+2025-03-31 00:56:29,766 - INFO - Generating text for prompt (first 50 chars): తెలుగులో ప్రోగ్రామింగ్ నేర్చుకోవడం ఎలా?...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Processing prompt 8/10
+2025-03-31 00:56:29,766 - INFO - Generating text for prompt (first 50 chars): ఇండియాలో టూరిస్ట్ ప్లేసెస్ ఏంటి?...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Processing prompt 9/10
+2025-03-31 00:56:29,766 - INFO - Generating text for prompt (first 50 chars): తెలుగు సాహిత్యం గురించి చెప్పండి...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Processing prompt 10/10
+2025-03-31 00:56:29,766 - INFO - Generating text for prompt (first 50 chars): వర్క్-లైఫ్ బ్యాలెన్స్ మెయింటైన్ చేయడం ఎలా?...
+2025-03-31 00:56:29,766 - ERROR - Error during text generation: 'ModelInference' object has no attribute 'generator'
+2025-03-31 00:56:29,766 - INFO - Results saved to tests_results.json
+2025-03-31 01:03:38,343 - INFO - Logging in to Hugging Face Hub with provided token
+2025-03-31 01:03:38,409 - INFO - Loading tokenizer from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 01:03:39,545 - INFO - Using bfloat16 precision for CUDA device
+2025-03-31 01:03:39,545 - INFO - Loading model from bharathkumar1922001/gemma-3-12b-telugu
+2025-03-31 01:03:39,673 - INFO - We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2025-03-31 01:03:44,096 - WARNING - Could not create text generation pipeline: The model has been loaded with `accelerate` and therefore cannot be moved to a specific device. Please discard the `device` argument when creating your pipeline object.
+2025-03-31 01:03:44,096 - INFO - Will fall back to direct model generation
+2025-03-31 01:03:44,096 - INFO - Model loaded successfully on cuda
+2025-03-31 01:03:44,098 - INFO - Model size: 12.19B parameters
+2025-03-31 01:03:44,098 - INFO - Loaded 10 prompts from prompts.json
+2025-03-31 01:03:44,098 - INFO - Processing prompt 1/10
+2025-03-31 01:04:14,213 - INFO - Text generated in 30.12s (17.00 tokens/s)
+2025-03-31 01:04:14,214 - INFO - Processing prompt 2/10
+2025-03-31 01:04:43,554 - INFO - Text generated in 29.34s (17.45 tokens/s)
+2025-03-31 01:04:43,554 - INFO - Processing prompt 3/10
+2025-03-31 01:05:12,884 - INFO - Text generated in 29.33s (17.46 tokens/s)
+2025-03-31 01:05:12,884 - INFO - Processing prompt 4/10
+2025-03-31 01:05:42,201 - INFO - Text generated in 29.32s (17.46 tokens/s)
+2025-03-31 01:05:42,201 - INFO - Processing prompt 5/10
+2025-03-31 01:05:42,323 - INFO - Text generated in 0.12s (4209.89 tokens/s)
+2025-03-31 01:05:42,323 - INFO - Processing prompt 6/10
+2025-03-31 01:06:11,684 - INFO - Text generated in 29.36s (17.44 tokens/s)
+2025-03-31 01:06:11,685 - INFO - Processing prompt 7/10
+2025-03-31 01:06:41,014 - INFO - Text generated in 29.33s (17.46 tokens/s)
+2025-03-31 01:06:41,015 - INFO - Processing prompt 8/10
+2025-03-31 01:07:10,322 - INFO - Text generated in 29.31s (17.47 tokens/s)
+2025-03-31 01:07:10,322 - INFO - Processing prompt 9/10
+2025-03-31 01:07:39,680 - INFO - Text generated in 29.36s (17.44 tokens/s)
+2025-03-31 01:07:39,680 - INFO - Processing prompt 10/10
+2025-03-31 01:08:08,985 - INFO - Text generated in 29.30s (17.47 tokens/s)
+2025-03-31 01:08:08,986 - INFO - Results saved to tests_results.json
