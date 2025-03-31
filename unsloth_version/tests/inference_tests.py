@@ -108,7 +108,7 @@ class ModelInference:
                 torch_dtype=torch_dtype,
                 device_map="auto" if self.device == "cuda" else None,
                 low_cpu_mem_usage=True,
-                # use_cache=True,
+                # use_cache=True
             )
             
             # Create text generation pipeline
@@ -147,10 +147,8 @@ class ModelInference:
         try:
             logger.info(f"Generating text for prompt (first 50 chars): {prompt[:50]}...")
             
-            start_time = time.time()
-            
-            # Prepare generation parameters
-            generation_config = {
+            # Use the direct generation method
+            return self._generate_directly(prompt, {
                 "max_new_tokens": self.max_new_tokens,
                 "temperature": self.temperature,
                 "top_p": self.top_p,
@@ -158,37 +156,7 @@ class ModelInference:
                 "do_sample": self.temperature > 0,
                 "pad_token_id": self.tokenizer.pad_token_id,
                 "eos_token_id": self.tokenizer.eos_token_id,
-            }
-            
-            # Try using the pipeline if available
-            if self.generator is not None:
-                try:
-                    # Generate text using pipeline
-                    output = self.generator(
-                        prompt,
-                        **generation_config
-                    )
-                    
-                    # Extract generated text
-                    generated_text = output[0]["generated_text"]
-                    
-                    # Remove the original prompt from output if needed
-                    response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
-                    
-                except Exception as e:
-                    logger.warning(f"Pipeline generation failed: {e}. Falling back to direct model generation")
-                    response = self._generate_directly(prompt, generation_config)
-            else:
-                # Direct generation if pipeline is not available
-                response = self._generate_directly(prompt, generation_config)
-            
-            end_time = time.time()
-            generation_time = end_time - start_time
-            tokens_per_second = self.max_new_tokens / generation_time if generation_time > 0 else 0
-            
-            logger.info(f"Text generated in {generation_time:.2f}s ({tokens_per_second:.2f} tokens/s)")
-            
-            return response.strip()
+            })
             
         except Exception as e:
             logger.error(f"Error during text generation: {str(e)}")
@@ -205,27 +173,39 @@ class ModelInference:
         Returns:
             str: Generated text
         """
-        # Tokenize the input
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        
-        # Move inputs to the same device as the model
-        device = next(self.model.parameters()).device
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-        
-        # Generate
-        with torch.no_grad():
-            output = self.model.generate(
-                **inputs,
-                **generation_config
-            )
-        
-        # Decode the output
-        generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        
-        # Remove the original prompt from output if needed
-        response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
-        
-        return response
+        try:
+            start_time = time.time()
+            
+            # Tokenize the input
+            inputs = self.tokenizer(prompt, return_tensors="pt")
+            
+            # Move inputs to the same device as the model
+            device = next(self.model.parameters()).device
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            
+            # Generate
+            with torch.no_grad():
+                output = self.model.generate(
+                    **inputs,
+                    **generation_config
+                )
+            
+            # Decode the output
+            generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
+            
+            # Remove the original prompt from output if needed
+            response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
+            
+            end_time = time.time()
+            generation_time = end_time - start_time
+            tokens_per_second = generation_config["max_new_tokens"] / generation_time if generation_time > 0 else 0
+            
+            logger.info(f"Text generated in {generation_time:.2f}s ({tokens_per_second:.2f} tokens/s)")
+            
+            return response.strip()
+        except Exception as e:
+            logger.error(f"Error in direct generation: {str(e)}")
+            raise
     
     def generate_with_chat_template(self, user_message: str) -> str:
         """
@@ -241,7 +221,15 @@ class ModelInference:
             # Check if tokenizer has chat template
             if not hasattr(self.tokenizer, 'apply_chat_template'):
                 logger.warning("Tokenizer does not have chat template, falling back to regular generation")
-                return self.generate(user_message)
+                return self._generate_directly(user_message, {
+                    "max_new_tokens": self.max_new_tokens,
+                    "temperature": self.temperature,
+                    "top_p": self.top_p,
+                    "top_k": self.top_k,
+                    "do_sample": self.temperature > 0,
+                    "pad_token_id": self.tokenizer.pad_token_id,
+                    "eos_token_id": self.tokenizer.eos_token_id,
+                })
             
             # Format as chat
             messages = [{"role": "user", "content": user_message}]
@@ -256,7 +244,15 @@ class ModelInference:
             logger.info("Using chat template for generation")
             
             # Generate response
-            response = self.generate(prompt)
+            response = self._generate_directly(prompt, {
+                "max_new_tokens": self.max_new_tokens,
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+                "top_k": self.top_k,
+                "do_sample": self.temperature > 0,
+                "pad_token_id": self.tokenizer.pad_token_id,
+                "eos_token_id": self.tokenizer.eos_token_id,
+            })
             
             # Remove the system message if present in the response
             if "<start_of_turn>model" in response:
@@ -286,10 +282,22 @@ class ModelInference:
         for i, prompt in enumerate(prompts):
             logger.info(f"Processing prompt {i+1}/{len(prompts)}")
             
-            if use_chat_template:
-                response = self.generate_with_chat_template(prompt)
-            else:
-                response = self.generate(prompt)
+            try:
+                if use_chat_template:
+                    response = self.generate_with_chat_template(prompt)
+                else:
+                    response = self._generate_directly(prompt, {
+                        "max_new_tokens": self.max_new_tokens,
+                        "temperature": self.temperature,
+                        "top_p": self.top_p,
+                        "top_k": self.top_k,
+                        "do_sample": self.temperature > 0,
+                        "pad_token_id": self.tokenizer.pad_token_id,
+                        "eos_token_id": self.tokenizer.eos_token_id,
+                    })
+            except Exception as e:
+                logger.error(f"Error during text generation: {str(e)}")
+                response = f"Error: {str(e)}"
                 
             results.append(response)
             
