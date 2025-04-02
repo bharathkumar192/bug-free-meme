@@ -15,16 +15,17 @@ if ! pip list | grep -q unsloth; then
 fi
 
 # Default values
-MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu"
+# MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu"
+MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu-v1"
 HF_TOKEN="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"
 PROMPT=""
 PROMPT_FILE="prompts.json"
 OUTPUT_FILE="results.json"
-MAX_TOKENS=512
+MAX_TOKENS=1024
 TEMPERATURE=0.7
 DEVICE="auto"
 USE_QUESTION_FORMAT=false
-SYSTEM_PROMPT=""
+SYSTEM_PROMPT="Answer this question: "
 
 # Help function
 usage() {
@@ -137,7 +138,7 @@ if [ -z "$HF_TOKEN" ]; then
 fi
 
 # Build command
-CMD="python simplified_inference.py --model_id \"$MODEL_ID\""
+CMD="python inference.py --model_id \"$MODEL_ID\""
 
 if [ ! -z "$PROMPT" ]; then
   CMD="$CMD --prompt \"$PROMPT\""

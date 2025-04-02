@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Default values
 HF_TOKEN="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"
-REPO_ID="bharathkumar1922001/gemma-3-12b-telugu"
+REPO_ID="maya-ai/randomized_llm"
 FILES="tests_results.json, inference.log"
 REPO_TYPE="model"  # Default repo type
 
