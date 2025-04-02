@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run inference on a Hugging Face model
+# Run simplified Gemma-3 Telugu inference
 
 # ANSI color codes for better readability
 GREEN='\033[0;32m'
@@ -8,20 +8,9 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-
-apt-get update && apt-get install -y git-lfs
-git lfs install
-git lfs pull
-
-# Check if the inference.py script exists
-if [ ! -f "inference_tests.py" ]; then
-  echo -e "${RED}Error: inference_tests.py script not found in the current directory${NC}"
-  exit 1
-fi
-
 # Check if unsloth is installed
 if ! pip list | grep -q unsloth; then
-  echo -e "${YELLOW}Warning: unsloth package is not installed. Installing now...${NC}"
+  echo -e "${YELLOW}Installing unsloth...${NC}"
   pip install unsloth
 fi
 
@@ -30,48 +19,50 @@ MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu"
 HF_TOKEN="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"
 PROMPT=""
 PROMPT_FILE="prompts.json"
-OUTPUT_FILE="tests_results.json"
-MAX_NEW_TOKENS=512
+OUTPUT_FILE="results.json"
+MAX_TOKENS=512
 TEMPERATURE=0.7
-TOP_P=0.95
-TOP_K=50
-USE_CHAT_TEMPLATE=false
-QUESTION_PROMPT=false
 DEVICE="auto"
+USE_QUESTION_FORMAT=false
+SYSTEM_PROMPT=""
 
-# Function to display usage
+# Help function
 usage() {
-  echo -e "${BLUE}Usage:${NC} $0 [options]"
+  echo -e "${BLUE}Simplified Gemma-3 Telugu Inference${NC}"
+  echo "Usage: $0 --model_id MODEL_ID [options]"
   echo ""
-  echo "Options:"
-  echo "  --model_id MODEL_ID       Hugging Face model ID or local path (required)"
-  echo "  --hf_token TOKEN          Hugging Face token for private repos (or set HF_TOKEN env var)"
-  echo "  --prompt TEXT             Single prompt for text generation"
-  echo "  --prompt_file FILE        JSON file containing prompts for batch generation"
-  echo "  --output_file FILE        Output file for results (default: results.json)"
-  echo "  --max_new_tokens N        Maximum number of tokens to generate (default: 512)"
-  echo "  --temperature N           Temperature for sampling (default: 0.7)"
-  echo "  --top_p N                 Top-p sampling parameter (default: 0.95)"
-  echo "  --top_k N                 Top-k sampling parameter (default: 50)"
-  echo "  --use_chat_template       Use the model's chat template for generation"
-  echo "  --question_prompt        Format prompt as 'Question: X\\nAnswer:' (for non-chat inference)"
-  echo "  --device TYPE             Device to run inference on (auto, cpu, cuda) (default: auto)"
-  echo "  --help                    Display this help message"
+  echo "Required:"
+  echo "  --model_id MODEL_ID       Model ID (e.g., username/model-name)"
   echo ""
-  echo "Example:"
-  echo "  $0 --model_id your-username/your-model --prompt \"How are you today?\""
+  echo "Input options:"
+  echo "  --prompt TEXT             Single prompt text"
+  echo "  --prompt_file FILE        JSON file with prompts"
+  echo "  --output_file FILE        Output file (default: results.json)"
+  echo ""
+  echo "Authentication:"
+  echo "  --hf_token TOKEN          HuggingFace token (or set HF_TOKEN env var)"
+  echo ""
+  echo "Generation options:"
+  echo "  --max_tokens N            Maximum tokens to generate (default: 512)"
+  echo "  --temperature N           Temperature (default: 0.7)"
+  echo "  --device TYPE             Device: auto, cpu, cuda (default: auto)"
+  echo ""
+  echo "Formatting options:"
+  echo "  --use_question_format     Format prompts as Question/Answer"
+  echo "  --system_prompt TEXT      System prompt to use"
+  echo "  --system_prompt_file FILE Load system prompt from file"
+  echo ""
+  echo "Examples:"
+  echo "  $0 --model_id username/model --prompt \"హలో, నా పేరు రాము\""
+  echo "  $0 --model_id username/model --prompt_file prompts.json --use_question_format"
   exit 1
 }
 
-# Parse command line arguments
+# Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model_id)
       MODEL_ID="$2"
-      shift 2
-      ;;
-    --hf_token)
-      HF_TOKEN="$2"
       shift 2
       ;;
     --prompt)
@@ -86,72 +77,67 @@ while [[ $# -gt 0 ]]; do
       OUTPUT_FILE="$2"
       shift 2
       ;;
-    --max_new_tokens)
-      MAX_NEW_TOKENS="$2"
+    --hf_token)
+      HF_TOKEN="$2"
+      shift 2
+      ;;
+    --max_tokens)
+      MAX_TOKENS="$2"
       shift 2
       ;;
     --temperature)
       TEMPERATURE="$2"
       shift 2
       ;;
-    --top_p)
-      TOP_P="$2"
-      shift 2
-      ;;
-    --top_k)
-      TOP_K="$2"
-      shift 2
-      ;;
-    --use_chat_template)
-      USE_CHAT_TEMPLATE=true
-      shift
-      ;;
-    --question_prompt)
-      QUESTION_PROMPT=true
-      shift
-      ;;
     --device)
       DEVICE="$2"
+      shift 2
+      ;;
+    --use_question_format)
+      USE_QUESTION_FORMAT=true
+      shift
+      ;;
+    --system_prompt)
+      SYSTEM_PROMPT="$2"
+      shift 2
+      ;;
+    --system_prompt_file)
+      if [ -f "$2" ]; then
+        SYSTEM_PROMPT=$(cat "$2")
+      else
+        echo -e "${RED}Error: System prompt file not found: $2${NC}"
+        exit 1
+      fi
       shift 2
       ;;
     --help)
       usage
       ;;
     *)
-      echo -e "${RED}Error: Unknown option $1${NC}"
+      echo -e "${RED}Error: Unknown option: $1${NC}"
       usage
       ;;
   esac
 done
 
-# Check if model ID is provided
+# Check required arguments
 if [ -z "$MODEL_ID" ]; then
   echo -e "${RED}Error: --model_id is required${NC}"
   usage
 fi
 
-# Check if either prompt or prompt_file is provided
 if [ -z "$PROMPT" ] && [ -z "$PROMPT_FILE" ]; then
-  echo -e "${RED}Error: Either --prompt or --prompt_file must be provided${NC}"
+  echo -e "${RED}Error: Either --prompt or --prompt_file is required${NC}"
   usage
 fi
 
-# Check for HF token in environment variable if not provided
+# Get HF token from environment if not provided
 if [ -z "$HF_TOKEN" ]; then
   HF_TOKEN="$HF_TOKEN"
-  if [ -z "$HF_TOKEN" ]; then
-    echo -e "${YELLOW}Warning: No Hugging Face token provided. Using HF_TOKEN environment variable if set.${NC}"
-  fi
 fi
 
-# Build the command
-CMD="python inference_tests.py --model_id \"$MODEL_ID\""
-
-
-
-if [ ! -z "$HF_TOKEN" ]; then
-  CMD="$CMD --hf_token \"$HF_TOKEN\""
-fi
+# Build command
+CMD="python simplified_inference.py --model_id \"$MODEL_ID\""
 
 if [ ! -z "$PROMPT" ]; then
   CMD="$CMD --prompt \"$PROMPT\""
@@ -162,34 +148,34 @@ if [ ! -z "$PROMPT_FILE" ]; then
 fi
 
 CMD="$CMD --output_file \"$OUTPUT_FILE\""
-CMD="$CMD --max_new_tokens $MAX_NEW_TOKENS"
-CMD="$CMD --temperature $TEMPERATURE"
-CMD="$CMD --top_p $TOP_P"
-CMD="$CMD --top_k $TOP_K"
-CMD="$CMD --device $DEVICE"
 
-if [ "$USE_CHAT_TEMPLATE" = true ]; then
-  CMD="$CMD --use_chat_template"
+if [ ! -z "$HF_TOKEN" ]; then
+  CMD="$CMD --hf_token \"$HF_TOKEN\""
 fi
 
-if [ "$QUESTION_PROMPT" = true ]; then
-  CMD="$CMD --question_prompt"
+CMD="$CMD --max_new_tokens $MAX_TOKENS --temperature $TEMPERATURE --device $DEVICE"
+
+if [ "$USE_QUESTION_FORMAT" = true ]; then
+  CMD="$CMD --use_question_format"
 fi
 
-# Print the command
+if [ ! -z "$SYSTEM_PROMPT" ]; then
+  CMD="$CMD --system_prompt \"$SYSTEM_PROMPT\""
+fi
+
+# Print and execute command
 echo -e "${BLUE}Running command:${NC}"
 echo -e "${YELLOW}$CMD${NC}"
 echo ""
 
-# Execute the command
 eval $CMD
 
-
-
-# Check if the command was successful
+# Check result
 if [ $? -eq 0 ]; then
   echo -e "${GREEN}Inference completed successfully!${NC}"
-  echo -e "${GREEN}Results saved to: $OUTPUT_FILE${NC}"
+  if [ ! -z "$OUTPUT_FILE" ]; then
+    echo -e "${GREEN}Results saved to: $OUTPUT_FILE${NC}"
+  fi
 else
   echo -e "${RED}Inference failed!${NC}"
 fi

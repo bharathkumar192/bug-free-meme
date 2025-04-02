@@ -1,13 +1,12 @@
-import unsloth  # Import unsloth first to apply all optimizations
+import unsloth  # Import unsloth first
 import torch
 import argparse
 import logging
 import time
 import json
 import os
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from huggingface_hub import login
-from typing import List, Dict, Any, Optional
 from unsloth.chat_templates import get_chat_template
 
 # Configure logging
@@ -21,430 +20,288 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class ModelInference:
-    def __init__(
-        self,
-        model_id: str,
-        hf_token: str,
-        max_new_tokens: int = 512,
-        temperature: float = 0.7,
-        top_p: float = 0.95,
-        top_k: int = 50,
-        device: str = "auto",
-    ):
-        """
-        Initialize the inference class with model and generation parameters
-        
-        Args:
-            model_id (str): Hugging Face model ID or local path
-            hf_token (str): Hugging Face token for accessing private repositories
-            max_new_tokens (int): Maximum number of tokens to generate
-            temperature (float): Temperature for sampling
-            top_p (float): Top-p sampling parameter
-            top_k (int): Top-k sampling parameter
-            device (str): Device to run inference on ('cpu', 'cuda', 'auto')
-        """
-        self.model_id = model_id
-        self.hf_token = hf_token
-        
-        # Generation parameters
-        self.max_new_tokens = max_new_tokens
-        self.temperature = temperature
-        self.top_p = top_p
-        self.top_k = top_k
-        
-        # Automatically determine device if set to 'auto'
-        if device == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
-            
-        # Initialize model and tokenizer
-        self._init_model()
+def setup_model(model_id, hf_token, device="auto"):
+    """
+    Load the model and tokenizer
     
-    def _init_model(self):
-        """Initialize the model and tokenizer with authentication"""
-        try:
-            # Log in to Hugging Face
-            logger.info(f"Logging in to Hugging Face Hub with provided token")
-            login(token=self.hf_token)
-            
-            # Load tokenizer
-            logger.info(f"Loading tokenizer from {self.model_id}")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_id,
-                token=self.hf_token,
-                trust_remote_code=True,
-                padding_side="right",
-            )
-            
-            # Ensure padding token is set
-            if self.tokenizer.pad_token is None:
-                logger.info("Setting pad_token to eos_token")
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-                
-            # Apply Gemma-3 chat template if needed
-            if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template is None:
-                logger.info("Applying Gemma-3 chat template")
-                self.tokenizer = get_chat_template(
-                    self.tokenizer,
-                    chat_template="gemma-3"
-                )
-            
-            # Determine data type based on device
-            if self.device == "cuda":
-                torch_dtype = torch.bfloat16  # Use bfloat16 for GPU (not fp16/float16)
-                logger.info("Using bfloat16 precision for CUDA device")
-            else:
-                torch_dtype = torch.float32
-                logger.info("Using float32 precision for CPU device")
-            
-            # Load model
-            logger.info(f"Loading model from {self.model_id}")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id,
-                token=self.hf_token,
-                trust_remote_code=True,
-                torch_dtype=torch_dtype,
-                device_map="auto" if self.device == "cuda" else None,
-                low_cpu_mem_usage=True,
-                # use_cache=True
-            )
-            
-            # Create text generation pipeline
-            try:
-                self.generator = pipeline(
-                    "text-generation",
-                    model=self.model,
-                    tokenizer=self.tokenizer,
-                    device=0 if self.device == "cuda" else -1,
-                )
-                logger.info("Text generation pipeline created successfully")
-            except Exception as e:
-                logger.warning(f"Could not create text generation pipeline: {e}")
-                logger.info("Will fall back to direct model generation")
-            
-            logger.info(f"Model loaded successfully on {self.device}")
-            
-            # Get model details
-            model_parameters = sum(p.numel() for p in self.model.parameters()) / 1e9
-            logger.info(f"Model size: {model_parameters:.2f}B parameters")
-            
-        except Exception as e:
-            logger.error(f"Error initializing model: {str(e)}")
-            raise
+    Args:
+        model_id (str): Hugging Face model ID
+        hf_token (str): Hugging Face token
+        device (str): Device to run on
+        
+    Returns:
+        tuple: (model, tokenizer)
+    """
+    # Login to HuggingFace
+    login(token=hf_token)
+    logger.info(f"Loading model from {model_id}")
     
-    def generate(self, prompt: str) -> str:
-        """
-        Generate text based on the given prompt
-        
-        Args:
-            prompt (str): Input prompt for text generation
-            
-        Returns:
-            str: Generated text
-        """
-        try:
-            logger.info(f"Generating text for prompt (first 50 chars): {prompt[:50]}...")
-            
-            # Use the direct generation method
-            return self._generate_directly(prompt, {
-                "max_new_tokens": self.max_new_tokens,
-                "temperature": self.temperature,
-                "top_p": self.top_p,
-                "top_k": self.top_k,
-                "do_sample": self.temperature > 0,
-                "pad_token_id": self.tokenizer.pad_token_id,
-                "eos_token_id": self.tokenizer.eos_token_id,
-            })
-            
-        except Exception as e:
-            logger.error(f"Error during text generation: {str(e)}")
-            return f"Error: {str(e)}"
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id,
+        token=hf_token,
+        trust_remote_code=True
+    )
     
-    def _generate_directly(self, prompt: str, generation_config: Dict[str, Any]) -> str:
-        """
-        Directly generate text using the model without the pipeline
-        
-        Args:
-            prompt (str): Input prompt
-            generation_config (Dict[str, Any]): Generation parameters
-            
-        Returns:
-            str: Generated text
-        """
-        try:
-            start_time = time.time()
-            
-            # Tokenize the input
-            inputs = self.tokenizer(prompt, return_tensors="pt")
-            
-            # Move inputs to the same device as the model
-            device = next(self.model.parameters()).device
-            inputs = {k: v.to(device) for k, v in inputs.items()}
-            
-            # Generate
-            with torch.no_grad():
-                output = self.model.generate(
-                    **inputs,
-                    **generation_config
-                )
-            
-            # Decode the output
-            generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
-            
-            # Remove the original prompt from output if needed
-            response = generated_text[len(prompt):] if generated_text.startswith(prompt) else generated_text
-            
-            end_time = time.time()
-            generation_time = end_time - start_time
-            tokens_per_second = generation_config["max_new_tokens"] / generation_time if generation_time > 0 else 0
-            
-            logger.info(f"Text generated in {generation_time:.2f}s ({tokens_per_second:.2f} tokens/s)")
-            
-            return response.strip()
-        except Exception as e:
-            logger.error(f"Error in direct generation: {str(e)}")
-            raise
+    # Set pad token if needed
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     
-    def generate_with_chat_template(self, user_message: str) -> str:
-        """
-        Generate text using the model's chat template (if available)
-        
-        Args:
-            user_message (str): User message
-            
-        Returns:
-            str: Assistant's response
-        """
-        try:
-            # Check if tokenizer has chat template
-            if not hasattr(self.tokenizer, 'apply_chat_template'):
-                logger.warning("Tokenizer does not have chat template, falling back to regular generation")
-                return self._generate_directly(user_message, {
-                    "max_new_tokens": self.max_new_tokens,
-                    "temperature": self.temperature,
-                    "top_p": self.top_p,
-                    "top_k": self.top_k,
-                    "do_sample": self.temperature > 0,
-                    "pad_token_id": self.tokenizer.pad_token_id,
-                    "eos_token_id": self.tokenizer.eos_token_id,
-                })
-            
-            # Format as chat
-            messages = [{"role": "user", "content": user_message}]
-            
-            # Apply chat template
-            prompt = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
-            
-            logger.info("Using chat template for generation")
-            
-            # Generate response
-            response = self._generate_directly(prompt, {
-                "max_new_tokens": self.max_new_tokens,
-                "temperature": self.temperature,
-                "top_p": self.top_p,
-                "top_k": self.top_k,
-                "do_sample": self.temperature > 0,
-                "pad_token_id": self.tokenizer.pad_token_id,
-                "eos_token_id": self.tokenizer.eos_token_id,
-            })
-            
-            # Remove the system message if present in the response
-            if "<start_of_turn>model" in response:
-                response = response.split("<start_of_turn>model")[1].strip()
-            if "<end_of_turn>" in response:
-                response = response.split("<end_of_turn>")[0].strip()
-            
-            return response
-        
-        except Exception as e:
-            logger.error(f"Error during chat generation: {str(e)}")
-            return f"Error: {str(e)}"
+    # Apply Gemma-3 chat template if needed
+    if hasattr(tokenizer, "chat_template") and tokenizer.chat_template is None:
+        tokenizer = get_chat_template(tokenizer, chat_template="gemma-3")
     
-    def generate_batch(self, prompts: List[str], use_chat_template: bool = False) -> List[str]:
-        """
-        Generate text for a batch of prompts
-        
-        Args:
-            prompts (List[str]): List of input prompts
-            use_chat_template (bool): Whether to use chat template
-            
-        Returns:
-            List[str]: List of generated texts
-        """
-        results = []
-        
-        for i, prompt in enumerate(prompts):
-            logger.info(f"Processing prompt {i+1}/{len(prompts)}")
-            
-            try:
-                if use_chat_template:
-                    response = self.generate_with_chat_template(prompt)
-                else:
-                    response = self._generate_directly(prompt, {
-                        "max_new_tokens": self.max_new_tokens,
-                        "temperature": self.temperature,
-                        "top_p": self.top_p,
-                        "top_k": self.top_k,
-                        "do_sample": self.temperature > 0,
-                        "pad_token_id": self.tokenizer.pad_token_id,
-                        "eos_token_id": self.tokenizer.eos_token_id,
-                    })
-            except Exception as e:
-                logger.error(f"Error during text generation: {str(e)}")
-                response = f"Error: {str(e)}"
-                
-            results.append(response)
-            
-        return results
+    # Set device
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    def save_to_json(self, prompts: List[str], responses: List[str], output_file: str):
-        """
-        Save prompts and responses to a JSON file
-        
-        Args:
-            prompts (List[str]): List of input prompts
-            responses (List[str]): List of generated responses
-            output_file (str): Path to output JSON file
-        """
-        results = []
-        
-        for prompt, response in zip(prompts, responses):
-            results.append({
-                "prompt": prompt,
-                "response": response
-            })
-            
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump({"results": results}, f, ensure_ascii=False, indent=2)
-            
-        logger.info(f"Results saved to {output_file}")
+    # Select appropriate dtype based on device
+    torch_dtype = torch.bfloat16 if device == "cuda" else torch.float32
+    
+    # Load model
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id,
+        token=hf_token,
+        trust_remote_code=True,
+        torch_dtype=torch_dtype,
+        device_map="auto" if device == "cuda" else None
+    )
+    
+    logger.info(f"Model loaded successfully on {device}")
+    return model, tokenizer
 
+def generate_text(model, tokenizer, prompt, system_prompt=None, generation_params=None):
+    """
+    Generate text from a prompt
+    
+    Args:
+        model: Hugging Face model
+        tokenizer: Hugging Face tokenizer
+        prompt (str): Input prompt
+        system_prompt (str): Optional system prompt
+        generation_params (dict): Generation parameters
+        
+    Returns:
+        str: Generated text
+    """
+    start_time = time.time()
+    logger.info(f"Generating text for: {prompt[:50]}...")
+    
+    # Apply system prompt if provided
+    if system_prompt:
+        # Format with both system and user messages
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        formatted_prompt = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+    else:
+        # Just use the plain prompt
+        formatted_prompt = prompt
+    
+    # Print what's being sent to the model
+    print("\n" + "=" * 40)
+    print("SENDING TO MODEL:")
+    print("-" * 40)
+    print(formatted_prompt)
+    print("=" * 40 + "\n")
+    
+    # Default generation parameters
+    if generation_params is None:
+        generation_params = {
+            "max_new_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 50,
+            "do_sample": True,
+            "pad_token_id": tokenizer.pad_token_id,
+            "eos_token_id": tokenizer.eos_token_id
+        }
+    
+    # Tokenize input
+    inputs = tokenizer(formatted_prompt, return_tensors="pt")
+    
+    # Get device from model
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    
+    # Generate
+    with torch.no_grad():
+        output = model.generate(**inputs, **generation_params)
+    
+    # Decode
+    generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
+    
+    # Remove the prompt from the response
+    if generated_text.startswith(formatted_prompt):
+        response = generated_text[len(formatted_prompt):].strip()
+    else:
+        response = generated_text.strip()
+    
+    # Clean up response if using chat template
+    if system_prompt:
+        if "<start_of_turn>model" in response:
+            response = response.split("<start_of_turn>model")[1].strip()
+        if "<end_of_turn>" in response:
+            response = response.split("<end_of_turn>")[0].strip()
+    
+    generation_time = time.time() - start_time
+    logger.info(f"Generated text in {generation_time:.2f}s")
+    
+    return response
+
+def process_batch(model, tokenizer, prompts, system_prompt=None, generation_params=None, use_question_format=False):
+    """
+    Process a batch of prompts
+    
+    Args:
+        model: Hugging Face model
+        tokenizer: Hugging Face tokenizer
+        prompts (list): List of prompts
+        system_prompt (str): Optional system prompt
+        generation_params (dict): Generation parameters
+        use_question_format (bool): Format prompts as questions
+        
+    Returns:
+        list: List of generated responses
+    """
+    results = []
+    
+    for i, prompt in enumerate(prompts):
+        logger.info(f"Processing prompt {i+1}/{len(prompts)}")
+        
+        # Format as question if needed
+        if use_question_format:
+            formatted_prompt = f"Question: {prompt}\nAnswer:"
+        else:
+            formatted_prompt = prompt
+        
+        # Generate response
+        try:
+            response = generate_text(model, tokenizer, formatted_prompt, system_prompt, generation_params)
+            results.append(response)
+        except Exception as e:
+            logger.error(f"Error generating response: {str(e)}")
+            results.append(f"Error: {str(e)}")
+    
+    return results
+
+def save_results(prompts, responses, output_file):
+    """
+    Save results to a JSON file
+    
+    Args:
+        prompts (list): List of prompts
+        responses (list): List of responses
+        output_file (str): Output file path
+    """
+    results = []
+    for prompt, response in zip(prompts, responses):
+        results.append({
+            "prompt": prompt,
+            "response": response
+        })
+    
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump({"results": results}, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"Results saved to {output_file}")
 
 def main():
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Run inference on a Hugging Face model")
+    parser = argparse.ArgumentParser(description="Simplified Gemma-3 Telugu Inference")
     
-    # Required arguments
-    parser.add_argument("--model_id", type=str, required=True,
-                        help="Hugging Face model ID or local path")
+    # Basic arguments
+    parser.add_argument("--model_id", type=str, required=True, help="Model ID")
+    parser.add_argument("--prompt", type=str, default=None, help="Single prompt")
+    parser.add_argument("--prompt_file", type=str, default=None, help="JSON file with prompts")
+    parser.add_argument("--output_file", type=str, default="results.json", help="Output file")
+    parser.add_argument("--hf_token", type=str, default=None, help="HuggingFace token")
     
-    # Input options
-    parser.add_argument("--prompt", type=str, default=None,
-                        help="Single prompt for text generation")
-    parser.add_argument("--prompt_file", type=str, default=None,
-                        help="JSON file containing prompts for batch generation")
-    parser.add_argument("--output_file", type=str, default="inference_results.json",
-                        help="Output file for batch generation results")
+    # Generation options
+    parser.add_argument("--max_new_tokens", type=int, default=512, help="Max tokens to generate")
+    parser.add_argument("--temperature", type=float, default=0.7, help="Temperature")
+    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"], help="Device")
     
-    # Generation parameters
-    parser.add_argument("--max_new_tokens", type=int, default=512,
-                        help="Maximum number of tokens to generate")
-    parser.add_argument("--temperature", type=float, default=0.7,
-                        help="Temperature for sampling")
-    parser.add_argument("--top_p", type=float, default=0.95,
-                        help="Top-p sampling parameter")
-    parser.add_argument("--top_k", type=int, default=50,
-                        help="Top-k sampling parameter")
-    
-    # Chat template option
-    parser.add_argument("--use_chat_template", action="store_true",
-                        help="Use the model's chat template for generation")
-    
-    # Device selection
-    parser.add_argument("--device", type=str, default="auto",
-                        choices=["auto", "cpu", "cuda"],
-                        help="Device to run inference on")
-    
-    # Authentication
-    parser.add_argument("--hf_token", type=str, default=None,
-                        help="Hugging Face token for accessing private repositories")
-    parser.add_argument("--question_prompt", type=str, 
-                        default=None,
-                        help="Question prompt to append to each prompt (for 'Question: X Answer:' format)")
+    # Formatting options
+    parser.add_argument("--use_question_format", action="store_true", help="Format as Question/Answer")
+    parser.add_argument("--system_prompt", type=str, default=None, help="System prompt")
     
     args = parser.parse_args()
     
-    # Check for HF token in environment variable if not provided
+    # Check for token in environment
     hf_token = args.hf_token or os.environ.get("HF_TOKEN")
     if not hf_token:
-        parser.error("Hugging Face token must be provided either via --hf_token argument or HF_TOKEN environment variable")
+        raise ValueError("Hugging Face token required. Use --hf_token or set HF_TOKEN env var")
     
-    # Check if either prompt or prompt_file is provided
+    # Check for prompt or prompt file
     if args.prompt is None and args.prompt_file is None:
-        parser.error("Either --prompt or --prompt_file must be provided")
+        raise ValueError("Either --prompt or --prompt_file is required")
     
-    # Initialize inference class
-    inference = ModelInference(
-        model_id=args.model_id,
-        hf_token=hf_token,
-        max_new_tokens=args.max_new_tokens,
-        temperature=args.temperature,
-        top_p=args.top_p,
-        top_k=args.top_k,
-        device=args.device,
-    )
+    # Load model and tokenizer
+    model, tokenizer = setup_model(args.model_id, hf_token, args.device)
     
-    # Single prompt generation
-    if args.prompt is not None:
-        # Apply question format if needed
-        prompt = args.prompt
-        if args.question_prompt and not args.use_chat_template:
-            prompt = f"Question: {args.prompt}\nAnswer:"
-            
-        if args.use_chat_template:
-            response = inference.generate_with_chat_template(args.prompt)
-        else:
-            response = inference.generate(prompt)
-            
+    # Set generation parameters
+    generation_params = {
+        "max_new_tokens": args.max_new_tokens,
+        "temperature": args.temperature,
+        "top_p": 0.95,
+        "top_k": 50,
+        "do_sample": args.temperature > 0,
+        "pad_token_id": tokenizer.pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id
+    }
+    
+    # For single prompt
+    if args.prompt:
+        response = generate_text(
+            model, 
+            tokenizer, 
+            f"Question: {args.prompt}\nAnswer:" if args.use_question_format else args.prompt,
+            args.system_prompt,
+            generation_params
+        )
+        
         print("\nGenerated Text:")
         print("-" * 40)
         print(response)
         print("-" * 40)
         
-        # Save single result to JSON
-        inference.save_to_json([args.prompt], [response], args.output_file)
+        save_results([args.prompt], [response], args.output_file)
     
-    # Batch generation from file
-    elif args.prompt_file is not None:
-        try:
-            # Load prompts from file
-            with open(args.prompt_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                
-            # Extract prompts
-            if isinstance(data, list):
-                prompts = data
-            elif isinstance(data, dict) and "prompts" in data:
-                prompts = data["prompts"]
-            elif isinstance(data, dict) and "questions" in data:
-                prompts = [item["question"] for item in data["questions"]]
-            else:
-                logger.error(f"Unsupported prompt file format")
-                return
-                
-            logger.info(f"Loaded {len(prompts)} prompts from {args.prompt_file}")
-            
-            # Apply question format if needed
-            if args.question_prompt and not args.use_chat_template:
-                formatted_prompts = [f"Question: {p}\nAnswer:" for p in prompts]
-                # Generate responses with formatted prompts
-                responses = inference.generate_batch(formatted_prompts, args.use_chat_template)
-            else:
-                # Generate responses with original prompts
-                responses = inference.generate_batch(prompts, args.use_chat_template)
-            
-            # Save results
-            inference.save_to_json(prompts, responses, args.output_file)
-            
-        except Exception as e:
-            logger.error(f"Error processing prompt file: {str(e)}")
-
+    # For batch processing
+    elif args.prompt_file:
+        # Load prompts
+        with open(args.prompt_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Extract prompts from different formats
+        if isinstance(data, list):
+            prompts = data
+        elif isinstance(data, dict) and "prompts" in data:
+            prompts = data["prompts"]
+        elif isinstance(data, dict) and "questions" in data:
+            prompts = [item["question"] for item in data["questions"]]
+        else:
+            raise ValueError("Unsupported prompt file format")
+        
+        logger.info(f"Loaded {len(prompts)} prompts")
+        
+        # Process batch
+        responses = process_batch(
+            model,
+            tokenizer,
+            prompts,
+            args.system_prompt,
+            generation_params,
+            args.use_question_format
+        )
+        
+        # Save results
+        save_results(prompts, responses, args.output_file)
 
 if __name__ == "__main__":
     main()
