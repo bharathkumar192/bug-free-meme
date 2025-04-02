@@ -25,7 +25,7 @@ MAX_TOKENS=1024
 TEMPERATURE=0.7
 DEVICE="auto"
 USE_QUESTION_FORMAT=false
-SYSTEM_PROMPT="Answer this question: "
+# SYSTEM_PROMPT="Answer this question: "
 
 # Help function
 usage() {
