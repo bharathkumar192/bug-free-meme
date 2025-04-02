@@ -16,7 +16,7 @@ fi
 
 # Default values
 # MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu"
-MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu-v1"
+MODEL_ID="bharathkumar1922001/gemma-3-12b-telugu"
 HF_TOKEN="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"
 PROMPT=""
 PROMPT_FILE="prompts.json"
