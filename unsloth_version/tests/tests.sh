@@ -8,22 +8,6 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Check if the inference.py script exists
-if [ ! -f "enhanced_inference.py" ]; then
-  echo -e "${YELLOW}Warning: enhanced_inference.py script not found in the current directory${NC}"
-  echo -e "${YELLOW}Checking if we need to create the enhanced inference script...${NC}"
-  
-  # Check if the original script exists to create the enhanced version
-  if [ ! -f "inference_tests.py" ]; then
-    echo -e "${RED}Error: inference_tests.py script not found in the current directory${NC}"
-    echo -e "${RED}Cannot create enhanced_inference.py without the original script${NC}"
-    exit 1
-  else
-    echo -e "${BLUE}Creating enhanced_inference.py from inference_tests.py...${NC}"
-    cp inference_tests.py enhanced_inference.py
-    echo -e "${GREEN}Created enhanced_inference.py. Please review and modify it according to the improvements discussed.${NC}"
-  fi
-fi
 
 # Check if unsloth is installed
 if ! pip list | grep -q unsloth; then
@@ -164,7 +148,7 @@ if [ -z "$HF_TOKEN" ]; then
 fi
 
 # Build the command
-CMD="python enhanced_inference.py --model_id \"$MODEL_ID\""
+CMD="python inference_tests.py --model_id \"$MODEL_ID\""
 
 if [ ! -z "$HF_TOKEN" ]; then
   CMD="$CMD --hf_token \"$HF_TOKEN\""
