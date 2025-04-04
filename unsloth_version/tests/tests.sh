@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run inference on a Hugging Face model
+# Run enhanced inference on a Hugging Face model
 
 # ANSI color codes for better readability
 GREEN='\033[0;32m'
@@ -9,9 +9,20 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Check if the inference.py script exists
-if [ ! -f "inference_tests.py" ]; then
-  echo -e "${RED}Error: inference_tests.py script not found in the current directory${NC}"
-  exit 1
+if [ ! -f "enhanced_inference.py" ]; then
+  echo -e "${YELLOW}Warning: enhanced_inference.py script not found in the current directory${NC}"
+  echo -e "${YELLOW}Checking if we need to create the enhanced inference script...${NC}"
+  
+  # Check if the original script exists to create the enhanced version
+  if [ ! -f "inference_tests.py" ]; then
+    echo -e "${RED}Error: inference_tests.py script not found in the current directory${NC}"
+    echo -e "${RED}Cannot create enhanced_inference.py without the original script${NC}"
+    exit 1
+  else
+    echo -e "${BLUE}Creating enhanced_inference.py from inference_tests.py...${NC}"
+    cp inference_tests.py enhanced_inference.py
+    echo -e "${GREEN}Created enhanced_inference.py. Please review and modify it according to the improvements discussed.${NC}"
+  fi
 fi
 
 # Check if unsloth is installed
@@ -26,12 +37,15 @@ HF_TOKEN="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"
 PROMPT=""
 PROMPT_FILE="prompts.json"
 OUTPUT_FILE="tests_results.json"
-MAX_NEW_TOKENS=512
+MAX_NEW_TOKENS=1024
 TEMPERATURE=0.7
 TOP_P=0.95
 TOP_K=50
-USE_CHAT_TEMPLATE=false
+USE_CHAT_TEMPLATE=true
 QUESTION_PROMPT=false
+SYSTEM_PROMPT=""
+DEFAULT_SYSTEM_PROMPT=true
+DEFAULT_SYSTEM_PROMPT_TEXT="Answer this question with valuable information and a natural tone."
 DEVICE="auto"
 
 # Function to display usage
@@ -44,17 +58,19 @@ usage() {
   echo "  --prompt TEXT             Single prompt for text generation"
   echo "  --prompt_file FILE        JSON file containing prompts for batch generation"
   echo "  --output_file FILE        Output file for results (default: results.json)"
-  echo "  --max_new_tokens N        Maximum number of tokens to generate (default: 512)"
+  echo "  --max_new_tokens N        Maximum number of tokens to generate (default: 1024)"
   echo "  --temperature N           Temperature for sampling (default: 0.7)"
   echo "  --top_p N                 Top-p sampling parameter (default: 0.95)"
   echo "  --top_k N                 Top-k sampling parameter (default: 50)"
   echo "  --use_chat_template       Use the model's chat template for generation"
-  echo "  --question_prompt        Format prompt as 'Question: X\\nAnswer:' (for non-chat inference)"
+  echo "  --system_prompt TEXT      System prompt to guide model responses"
+  echo "  --default_system_prompt   Use default system prompt for better quality responses"
+  echo "  --question_prompt         Format prompt as 'Question: X\\nAnswer:' (for non-chat inference)"
   echo "  --device TYPE             Device to run inference on (auto, cpu, cuda) (default: auto)"
   echo "  --help                    Display this help message"
   echo ""
   echo "Example:"
-  echo "  $0 --model_id your-username/your-model --prompt \"How are you today?\""
+  echo "  $0 --model_id your-username/your-model --prompt \"How are you today?\" --use_chat_template --default_system_prompt"
   exit 1
 }
 
@@ -101,6 +117,14 @@ while [[ $# -gt 0 ]]; do
       USE_CHAT_TEMPLATE=true
       shift
       ;;
+    --system_prompt)
+      SYSTEM_PROMPT="$2"
+      shift 2
+      ;;
+    --default_system_prompt)
+      DEFAULT_SYSTEM_PROMPT=true
+      shift
+      ;;
     --question_prompt)
       QUESTION_PROMPT=true
       shift
@@ -140,7 +164,7 @@ if [ -z "$HF_TOKEN" ]; then
 fi
 
 # Build the command
-CMD="python inference_tests.py --model_id \"$MODEL_ID\""
+CMD="python enhanced_inference.py --model_id \"$MODEL_ID\""
 
 if [ ! -z "$HF_TOKEN" ]; then
   CMD="$CMD --hf_token \"$HF_TOKEN\""
@@ -165,9 +189,48 @@ if [ "$USE_CHAT_TEMPLATE" = true ]; then
   CMD="$CMD --use_chat_template"
 fi
 
+if [ ! -z "$SYSTEM_PROMPT" ]; then
+  CMD="$CMD --system_prompt \"$SYSTEM_PROMPT\""
+fi
+
+if [ "$DEFAULT_SYSTEM_PROMPT" = true ]; then
+  CMD="$CMD --default_system_prompt"
+  # Add a note about what default system prompt is being used
+  echo -e "${YELLOW}Using default system prompt: \"$DEFAULT_SYSTEM_PROMPT_TEXT\"${NC}"
+fi
+
 if [ "$QUESTION_PROMPT" = true ]; then
   CMD="$CMD --question_prompt"
 fi
+
+# Print execution settings summary
+echo -e "${BLUE}========== INFERENCE SETTINGS SUMMARY ==========${NC}"
+echo -e "${GREEN}Model ID:${NC}           $MODEL_ID"
+echo -e "${GREEN}Output File:${NC}        $OUTPUT_FILE"
+echo -e "${GREEN}Device:${NC}             $DEVICE"
+echo -e "${GREEN}Max New Tokens:${NC}     $MAX_NEW_TOKENS"
+echo -e "${GREEN}Temperature:${NC}        $TEMPERATURE"
+echo -e "${GREEN}Top-p:${NC}              $TOP_P"
+echo -e "${GREEN}Top-k:${NC}              $TOP_K"
+echo -e "${GREEN}Using Chat Template:${NC} $USE_CHAT_TEMPLATE"
+echo -e "${GREEN}Using Question Format:${NC} $QUESTION_PROMPT"
+
+if [ "$DEFAULT_SYSTEM_PROMPT" = true ]; then
+  echo -e "${GREEN}System Prompt:${NC}      [DEFAULT] \"$DEFAULT_SYSTEM_PROMPT_TEXT\""
+elif [ ! -z "$SYSTEM_PROMPT" ]; then
+  echo -e "${GREEN}System Prompt:${NC}      \"$SYSTEM_PROMPT\""
+else
+  echo -e "${GREEN}System Prompt:${NC}      None"
+fi
+
+if [ ! -z "$PROMPT" ]; then
+  echo -e "${GREEN}Prompt:${NC}             \"$PROMPT\""
+elif [ ! -z "$PROMPT_FILE" ]; then
+  echo -e "${GREEN}Prompt File:${NC}        $PROMPT_FILE"
+fi
+
+echo -e "${BLUE}=============================================${NC}"
+echo ""
 
 # Print the command
 echo -e "${BLUE}Running command:${NC}"

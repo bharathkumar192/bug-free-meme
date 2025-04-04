@@ -31,6 +31,7 @@ class ModelInference:
         top_p: float = 0.95,
         top_k: int = 50,
         device: str = "auto",
+        system_prompt: str = None,
     ):
         """
         Initialize the inference class with model and generation parameters
@@ -43,6 +44,7 @@ class ModelInference:
             top_p (float): Top-p sampling parameter
             top_k (int): Top-k sampling parameter
             device (str): Device to run inference on ('cpu', 'cuda', 'auto')
+            system_prompt (str): Optional system prompt to guide model responses
         """
         self.model_id = model_id
         self.hf_token = hf_token
@@ -52,6 +54,7 @@ class ModelInference:
         self.temperature = temperature
         self.top_p = top_p
         self.top_k = top_k
+        self.system_prompt = system_prompt
         
         # Automatically determine device if set to 'auto'
         if device == "auto":
@@ -108,7 +111,6 @@ class ModelInference:
                 torch_dtype=torch_dtype,
                 device_map="auto" if self.device == "cuda" else None,
                 low_cpu_mem_usage=True,
-                # use_cache=True
             )
             
             # Create text generation pipeline
@@ -136,7 +138,7 @@ class ModelInference:
     
     def generate(self, prompt: str) -> str:
         """
-        Generate text based on the given prompt
+        Generate text based on the given prompt (non-chat mode)
         
         Args:
             prompt (str): Input prompt for text generation
@@ -207,12 +209,13 @@ class ModelInference:
             logger.error(f"Error in direct generation: {str(e)}")
             raise
     
-    def generate_with_chat_template(self, user_message: str) -> str:
+    def generate_with_chat_template(self, user_message: str, system_prompt: str = None) -> str:
         """
-        Generate text using the model's chat template (if available)
+        Generate text using the model's chat template with optional system prompt
         
         Args:
             user_message (str): User message
+            system_prompt (str, optional): System prompt to guide the model
             
         Returns:
             str: Assistant's response
@@ -231,8 +234,19 @@ class ModelInference:
                     "eos_token_id": self.tokenizer.eos_token_id,
                 })
             
+            # Use provided system prompt or default one
+            used_system_prompt = system_prompt if system_prompt else self.system_prompt
+            
             # Format as chat
-            messages = [{"role": "user", "content": user_message}]
+            if used_system_prompt:
+                messages = [
+                    {"role": "system", "content": used_system_prompt},
+                    {"role": "user", "content": user_message}
+                ]
+                logger.info(f"Using system prompt: {used_system_prompt[:50]}...")
+            else:
+                messages = [{"role": "user", "content": user_message}]
+                logger.info("No system prompt used")
             
             # Apply chat template
             prompt = self.tokenizer.apply_chat_template(
@@ -242,6 +256,13 @@ class ModelInference:
             )
             
             logger.info("Using chat template for generation")
+            
+            # Print the prompt being sent to the model (for debugging)
+            print("\n" + "=" * 40)
+            print("PROMPT SENT TO MODEL:")
+            print("-" * 40)
+            print(prompt)
+            print("=" * 40 + "\n")
             
             # Generate response
             response = self._generate_directly(prompt, {
@@ -254,7 +275,7 @@ class ModelInference:
                 "eos_token_id": self.tokenizer.eos_token_id,
             })
             
-            # Remove the system message if present in the response
+            # Clean up response if using Gemma-3 chat template
             if "<start_of_turn>model" in response:
                 response = response.split("<start_of_turn>model")[1].strip()
             if "<end_of_turn>" in response:
@@ -266,13 +287,14 @@ class ModelInference:
             logger.error(f"Error during chat generation: {str(e)}")
             return f"Error: {str(e)}"
     
-    def generate_batch(self, prompts: List[str], use_chat_template: bool = False) -> List[str]:
+    def generate_batch(self, prompts: List[str], use_chat_template: bool = False, system_prompt: str = None) -> List[str]:
         """
         Generate text for a batch of prompts
         
         Args:
             prompts (List[str]): List of input prompts
             use_chat_template (bool): Whether to use chat template
+            system_prompt (str, optional): System prompt for chat mode
             
         Returns:
             List[str]: List of generated texts
@@ -284,7 +306,7 @@ class ModelInference:
             
             try:
                 if use_chat_template:
-                    response = self.generate_with_chat_template(prompt)
+                    response = self.generate_with_chat_template(prompt, system_prompt)
                 else:
                     response = self._generate_directly(prompt, {
                         "max_new_tokens": self.max_new_tokens,
@@ -352,9 +374,17 @@ def main():
     parser.add_argument("--top_k", type=int, default=50,
                         help="Top-k sampling parameter")
     
-    # Chat template option
+    # Chat template options
     parser.add_argument("--use_chat_template", action="store_true",
                         help="Use the model's chat template for generation")
+    parser.add_argument("--system_prompt", type=str, default=None,
+                        help="System prompt to guide model responses")
+    parser.add_argument("--default_system_prompt", action="store_true",
+                        help="Use a default system prompt for better responses")
+    
+    # Question format option
+    parser.add_argument("--question_prompt", action="store_true", 
+                        help="Format prompt as 'Question: X Answer:' (for non-chat inference)")
     
     # Device selection
     parser.add_argument("--device", type=str, default="auto",
@@ -364,9 +394,6 @@ def main():
     # Authentication
     parser.add_argument("--hf_token", type=str, default=None,
                         help="Hugging Face token for accessing private repositories")
-    parser.add_argument("--question_prompt", type=str, 
-                        default=None,
-                        help="Question prompt to append to each prompt (for 'Question: X Answer:' format)")
     
     args = parser.parse_args()
     
@@ -379,6 +406,15 @@ def main():
     if args.prompt is None and args.prompt_file is None:
         parser.error("Either --prompt or --prompt_file must be provided")
     
+    # Set default system prompt if requested
+    system_prompt = None
+    if args.default_system_prompt:
+        system_prompt = "Answer this question with valuable additional information and a natural tone."
+        logger.info(f"Using default system prompt: {system_prompt}")
+    elif args.system_prompt:
+        system_prompt = args.system_prompt
+        logger.info(f"Using custom system prompt: {system_prompt}")
+    
     # Initialize inference class
     inference = ModelInference(
         model_id=args.model_id,
@@ -388,18 +424,21 @@ def main():
         top_p=args.top_p,
         top_k=args.top_k,
         device=args.device,
+        system_prompt=system_prompt,
     )
     
     # Single prompt generation
     if args.prompt is not None:
-        # Apply question format if needed
-        prompt = args.prompt
-        if args.question_prompt and not args.use_chat_template:
-            prompt = f"Question: {args.prompt}\nAnswer:"
-            
+        # Determine which generation method to use
         if args.use_chat_template:
+            # Chat template with optional system prompt
             response = inference.generate_with_chat_template(args.prompt)
         else:
+            # Regular generation with optional question formatting
+            prompt = args.prompt
+            if args.question_prompt:
+                prompt = f"Question: {args.prompt}\nAnswer:"
+                
             response = inference.generate(prompt)
             
         print("\nGenerated Text:")
@@ -430,14 +469,17 @@ def main():
                 
             logger.info(f"Loaded {len(prompts)} prompts from {args.prompt_file}")
             
-            # Apply question format if needed
-            if args.question_prompt and not args.use_chat_template:
-                formatted_prompts = [f"Question: {p}\nAnswer:" for p in prompts]
-                # Generate responses with formatted prompts
-                responses = inference.generate_batch(formatted_prompts, args.use_chat_template)
+            # Process based on selected generation method
+            if args.use_chat_template:
+                # Generate using chat template
+                responses = inference.generate_batch(prompts, use_chat_template=True)
             else:
-                # Generate responses with original prompts
-                responses = inference.generate_batch(prompts, args.use_chat_template)
+                # Format as questions if needed
+                if args.question_prompt:
+                    formatted_prompts = [f"Question: {p}\nAnswer:" for p in prompts]
+                    responses = inference.generate_batch(formatted_prompts, use_chat_template=False)
+                else:
+                    responses = inference.generate_batch(prompts, use_chat_template=False)
             
             # Save results
             inference.save_to_json(prompts, responses, args.output_file)
