@@ -462,7 +462,11 @@ def main():
             elif isinstance(data, dict) and "prompts" in data:
                 prompts = data["prompts"]
             elif isinstance(data, dict) and "questions" in data:
-                prompts = [item["question"] for item in data["questions"]]
+                # Check if questions is a list of strings or list of objects
+                if data["questions"] and isinstance(data["questions"][0], str):
+                    prompts = data["questions"]  # Direct list of question strings
+                else:
+                    prompts = [item["question"] for item in data["questions"]]  # List of objects with question key
             else:
                 logger.error(f"Unsupported prompt file format")
                 return
@@ -486,6 +490,7 @@ def main():
             
         except Exception as e:
             logger.error(f"Error processing prompt file: {str(e)}")
+            logger.exception("Details:")
 
 
 if __name__ == "__main__":
