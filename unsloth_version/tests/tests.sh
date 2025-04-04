@@ -21,16 +21,18 @@ HF_TOKEN="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"
 PROMPT=""
 PROMPT_FILE="prompts.json"
 OUTPUT_FILE="tests_results.json"
-MAX_NEW_TOKENS=1024
-TEMPERATURE=0.5
+MAX_NEW_TOKENS=512
+TEMPERATURE=0.3
 TOP_P=0.95
 TOP_K=50
-USE_CHAT_TEMPLATE=false
-QUESTION_PROMPT=true
-DEFAULT_SYSTEM_PROMPT=false
+USE_CHAT_TEMPLATE=true
+QUESTION_PROMPT=false
+DEFAULT_SYSTEM_PROMPT=true
 SYSTEM_PROMPT=""
 DEFAULT_SYSTEM_PROMPT_TEXT="Provide a helpful, direct answer to the user's question in Telugu with valuable additional information and a natural tone. Focus only on answering what was asked without repeating the question."
 DEVICE="auto"
+
+
 
 # Function to display usage
 usage() {
