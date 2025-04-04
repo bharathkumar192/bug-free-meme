@@ -26,7 +26,7 @@ class ModelInference:
         self,
         model_id: str,
         hf_token: str,
-        max_new_tokens: int = 1048,
+        max_new_tokens: int = 512,
         temperature: float = 0.7,
         top_p: float = 0.95,
         top_k: int = 50,
