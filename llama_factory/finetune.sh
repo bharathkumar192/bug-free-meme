@@ -87,13 +87,7 @@ fi
 echo
 echo "======================================================================"
 
-# Ask for confirmation
-read -p "Do you want to proceed with training? (y/n): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Training aborted."
-    exit 1
-fi
+
 
 # Set CUDA_VISIBLE_DEVICES environment variable if specified in config
 CUDA_VISIBLE_DEVICES_VALUE=$(python3 -c "import config; print(config.CUDA_VISIBLE_DEVICES if config.CUDA_VISIBLE_DEVICES is not None else '')")
@@ -102,9 +96,6 @@ if [ -n "$CUDA_VISIBLE_DEVICES_VALUE" ]; then
     echo "Set CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 fi
 
-
-
-# Add this to run_training.sh before running the Python script
 
 # Handle Weights & Biases authentication
 WANDB_ENABLED=$(python3 -c "import config; print(config.USE_WANDB)")
@@ -120,18 +111,6 @@ if [ "$WANDB_ENABLED" = "True" ]; then
         if [ -z "$WANDB_API_KEY" ]; then
             echo "WARNING: Weights & Biases is enabled but no API key is provided."
             echo "Please set WANDB_API_KEY environment variable or provide it in config.py."
-            
-            # Ask if user wants to provide API key now
-            read -p "Do you want to provide your W&B API key now? (y/n): " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                read -p "Enter your W&B API key: " WANDB_API_KEY_INPUT
-                export WANDB_API_KEY="$WANDB_API_KEY_INPUT"
-                echo "WANDB_API_KEY set for this session"
-            else
-                echo "Continuing without Weights & Biases authentication..."
-                echo "W&B may prompt for login during training."
-            fi
         else
             echo "Using WANDB_API_KEY from environment"
         fi
@@ -161,18 +140,6 @@ if [ "$HF_REPO_ENABLED" = "True" ]; then
         if [ -z "$HF_TOKEN" ]; then
             echo "WARNING: Hugging Face Hub upload is enabled but no API key is provided."
             echo "Please set HF_TOKEN environment variable or provide HUGGINGFACE_KEY in config.py."
-            
-            # Ask if user wants to provide API key now
-            read -p "Do you want to provide your Hugging Face API key now? (y/n): " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                read -p "Enter your Hugging Face API key: " HF_TOKEN_INPUT
-                export HF_TOKEN="$HF_TOKEN_INPUT"
-                echo "HF_TOKEN set for this session"
-            else
-                echo "Continuing without Hugging Face Hub authentication..."
-                echo "The model will not be pushed to Hugging Face Hub."
-            fi
         else
             echo "Using HF_TOKEN from environment"
         fi

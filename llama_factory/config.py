@@ -16,7 +16,7 @@ from pathlib import Path
 # ============================================================================
 
 # Path to input JSON file containing Telugu QA pairs
-INPUT_FILE = "telugu.json"
+INPUT_FILE = "telugu_final.json"
 
 # Directory to save model and checkpoints
 OUTPUT_DIR = "./gemma3-telugu-output"
@@ -40,7 +40,8 @@ HUGGINGFACE_REPO = "bharathkumar1922001/gemma-3-12b-pt-telugu-sft"
 
 # Hugging Face API key for accessing gated models and pushing to Hub
 # You can either set it here or use environment variables for better security
-HUGGINGFACE_KEY = "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"  # Set to your API key or leave as None to use HF_TOKEN environment variable
+HUGGINGFACE_KEY = "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"  
+# Set to your API key or leave as None to use HF_TOKEN environment variable
 
 # ============================================================================
 # WEIGHTS & BIASES CONFIGURATION
@@ -54,7 +55,8 @@ WANDB_PROJECT = "gemma-telugu"
 
 # Weights & Biases API key
 # You can either set it here or use environment variables for better security
-WANDB_API_KEY = "bc746fafa585f61730cdfd3c8226492c777f875a"  # Set to your API key or leave as None to use WANDB_API_KEY environment variable
+WANDB_API_KEY = "bc746fafa585f61730cdfd3c8226492c777f875a"  
+# Set to your API key or leave as None to use WANDB_API_KEY environment variable
 
 
 # ============================================================================
@@ -117,7 +119,7 @@ TRAINING_CONFIG = {
     
     # Optimization parameters
     "learning_rate": 2e-5,
-    "num_train_epochs": 5.0,
+    "num_train_epochs": 3.0,
     "lr_scheduler_type": "cosine",
     "warmup_ratio": 0.03,
     
@@ -130,8 +132,8 @@ TRAINING_CONFIG = {
     
     # Logging and checkpointing
     "logging_steps": 50,
-    "save_steps": 200,
-    "eval_steps": 200,
+    "save_steps": 100,
+    "eval_steps": 100,
     "plot_loss": True,
     "overwrite_output_dir": True,
     "save_safetensors": True,
