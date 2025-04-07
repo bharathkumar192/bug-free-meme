@@ -33,14 +33,14 @@ image = (
     )
     # First install PyTorch with specific version known to work with DeepSpeed
     .run_commands("pip install torch torchvision torchaudio packaging ninja wheel importlib-metadata pydantic transformers accelerate peft datasets deepspeed trl bitsandbytes wandb huggingface_hub pyyaml rouge-score sacrebleu ")
-    .run_commands("export DISABLE_VERSION_CHECK=1")
+    # .run_commands("export DISABLE_VERSION_CHECK=1")
     .run_commands("pip install --upgrade git+https://github.com/huggingface/transformers.git")
     .run_commands("pip install --upgrade git+https://github.com/hiyouga/LLaMA-Factory.git")
     .pip_install("flash-attn", extra_options="--no-build-isolation")
     # Add HF_TOKEN and WANDB_API_KEY
     .env({"HF_TOKEN": "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"})
     .env({"WANDB_API_KEY": "bc746fafa585f61730cdfd3c8226492c777f875a"})
-    .add_local_dir("/Users/yuvasaiveeravalli/Downloads/bug-free-meme/llama_factory", remote_path="/training")
+    .add_local_dir("/Users/yuvasaiveeravalli/Downloads/bug-free-meme/llama_factory", remote_path="/training", copy=True)
 )
 
 # Create volumes for caching models and storing training artifacts
@@ -66,6 +66,8 @@ def import_module_from_path(module_name, file_path):
     },
     memory=32384, # Increased memory
 )
+
+
 def run_finetune():
     """Runs the finetune.py functionality directly without using the shell script."""
     base_training_dir = Path("/training")

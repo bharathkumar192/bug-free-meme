@@ -366,6 +366,7 @@ def export_model(args) -> None:
     Args:
         args: Arguments from argument parser
     """
+    # Handle LoRA/QLoRA models
     if args.finetuning_type in ["lora", "qlora"]:
         logger.info("Exporting (merging) LoRA model")
         
@@ -386,77 +387,78 @@ def export_model(args) -> None:
         subprocess.run(["llamafactory-cli", "export", export_path], check=True)
         logger.info(f"Model exported to {export_config['export_dir']}")
         
-        # Push to Hugging Face Hub if configured
-        if hasattr(config, 'HUGGINGFACE_REPO') and config.HUGGINGFACE_REPO:
-            try:
-                logger.info(f"Pushing model to Hugging Face Hub: {config.HUGGINGFACE_REPO}")
-                
-                # Set environment variable for Hugging Face API token if provided
-                if hasattr(config, 'HUGGINGFACE_KEY') and config.HUGGINGFACE_KEY:
-                    os.environ["HF_TOKEN"] = config.HUGGINGFACE_KEY
-                    logger.info("Using Hugging Face API token from config")
-                
-                # Push the exported model to the Hub
-                api = HfApi()
-                model_path = export_config["export_dir"]
-                
-                # Create repository description
-                model_card = f"""
-                # Telugu Fine-tuned Gemma-3 Model
-                
-                This model is a fine-tuned version of `{args.model_name_or_path}` on Telugu question-answering data.
-                
-                ## Training Details
-                
-                - **Fine-tuning method:** {args.finetuning_type}
-                - **Base model:** {args.model_name_or_path}
-                - **Framework:** LLaMA Factory
-                
-                ## Usage
-                
-                ```python
-                from transformers import AutoModelForCausalLM, AutoTokenizer
-                
-                tokenizer = AutoTokenizer.from_pretrained("{config.HUGGINGFACE_REPO}")
-                model = AutoModelForCausalLM.from_pretrained("{config.HUGGINGFACE_REPO}")
-                
-                # Example usage
-                input_text = "Your Telugu question here"
-                inputs = tokenizer(input_text, return_tensors="pt")
-                outputs = model.generate(**inputs, max_length=100)
-                print(tokenizer.decode(outputs[0], skip_special_tokens=True))
-                ```
-                """
-                
-                # Push to Hub with commit message
-                result = api.create_repo(
-                    repo_id=config.HUGGINGFACE_REPO,
-                    exist_ok=True,
-                )
-                
-                api.upload_folder(
-                    folder_path=model_path,
-                    repo_id=config.HUGGINGFACE_REPO,
-                    commit_message=f"Upload fine-tuned {args.model_name_or_path} model with {args.finetuning_type}"
-                )
-                
-                # Upload README
-                with open(os.path.join(model_path, "README.md"), "w") as f:
-                    f.write(model_card)
-                
-                api.upload_file(
-                    path_or_fileobj=os.path.join(model_path, "README.md"),
-                    path_in_repo="README.md",
-                    repo_id=config.HUGGINGFACE_REPO,
-                    commit_message="Update model card"
-                )
-                
-                logger.info(f"Successfully pushed model to Hugging Face Hub: {config.HUGGINGFACE_REPO}")
-                logger.info(f"View your model at: https://huggingface.co/{config.HUGGINGFACE_REPO}")
-                
-            except Exception as e:
-                logger.error(f"Failed to push model to Hugging Face Hub: {str(e)}")
-                logger.info("Continuing without pushing to Hugging Face Hub")
+        # For LoRA/QLoRA, the model path is the merged dir
+        model_path = export_config["export_dir"]
+    else:
+        # For full fine-tuning, the model is already in the output directory
+        logger.info(f"Using fully fine-tuned model from {args.output_dir}")
+        model_path = args.output_dir
+    
+    # Push to Hugging Face Hub if configured - this code now works for all models
+    if hasattr(config, 'HUGGINGFACE_REPO') and config.HUGGINGFACE_REPO:
+        try:
+            logger.info(f"Pushing model to Hugging Face Hub: {config.HUGGINGFACE_REPO}")
+            
+            # Set environment variable for Hugging Face API token if provided
+            if hasattr(config, 'HUGGINGFACE_KEY') and config.HUGGINGFACE_KEY:
+                os.environ["HF_TOKEN"] = config.HUGGINGFACE_KEY
+                logger.info("Using Hugging Face API token from config")
+            
+            # Push the model to the Hub
+            api = HfApi()
+            
+            # Create repository description
+            model_card = f"""
+            # Telugu Fine-tuned Gemma-3 Model
+            
+            This model is a fine-tuned version of `{args.model_name_or_path}` on Telugu question-answering data.
+            
+            ## Training Details
+            
+            - **Fine-tuning method:** {args.finetuning_type}
+            - **Base model:** {args.model_name_or_path}
+            - **Framework:** LLaMA Factory
+            
+            ## Usage
+            
+            ```python
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            
+            tokenizer = AutoTokenizer.from_pretrained("{config.HUGGINGFACE_REPO}")
+            model = AutoModelForCausalLM.from_pretrained("{config.HUGGINGFACE_REPO}")
+            
+            # Example usage
+            input_text = "Your Telugu question here"
+            inputs = tokenizer(input_text, return_tensors="pt")
+            outputs = model.generate(**inputs, max_length=100)
+            print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+            ```
+            """
+            
+            # Create README file
+            readme_path = os.path.join(model_path, "README.md")
+            with open(readme_path, 'w') as f:
+                f.write(model_card)
+            
+            # Push to Hub with commit message
+            result = api.create_repo(
+                repo_id=config.HUGGINGFACE_REPO,
+                exist_ok=True,
+            )
+            
+            logger.info(f"Uploading model from {model_path} to {config.HUGGINGFACE_REPO}")
+            api.upload_folder(
+                folder_path=model_path,
+                repo_id=config.HUGGINGFACE_REPO,
+                commit_message=f"Upload fine-tuned {args.model_name_or_path} model with {args.finetuning_type}"
+            )
+            
+            logger.info(f"Successfully pushed model to Hugging Face Hub: {config.HUGGINGFACE_REPO}")
+            logger.info(f"View your model at: https://huggingface.co/{config.HUGGINGFACE_REPO}")
+            
+        except Exception as e:
+            logger.error(f"Failed to push model to Hugging Face Hub: {str(e)}")
+            logger.info("Continuing without pushing to Hugging Face Hub")
 
 def main():
     # Parse command line arguments (which override config values)
