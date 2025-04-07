@@ -33,6 +33,8 @@ echo "                Gemma-3-12B Telugu Fine-tuning"
 echo "======================================================================"
 echo
 
+
+
 # Extract key values from the config.py file using Python
 MODEL_NAME=$(python3 -c "import config; print(config.MODEL_NAME_OR_PATH)")
 FINETUNING_TYPE=$(python3 -c "import config; print(config.FINETUNING_TYPE)")

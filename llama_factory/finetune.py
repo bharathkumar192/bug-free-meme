@@ -138,7 +138,7 @@ def prepare_dataset(input_file: str, output_dir: str, val_size: float = 0.1, max
     converted_data = []
     for item in questions:
         converted_item = {
-            "instruction": item['question'],
+            "instruction": item['prompt'],
             "input": "",  # No separate input in this format
             "output": item['response']
         }
@@ -224,18 +224,32 @@ def create_deepspeed_config(args, output_dir: str) -> Optional[str]:
     logger.info(f"Created DeepSpeed configuration at {config_path}")
     return config_path
 
-def create_training_config(args, dataset_files, deepspeed_config: Optional[str] = None) -> str:
+def create_training_config(args, dataset_files: Dict[str, str], deepspeed_config: Optional[str] = None) -> str:
+    """
+    Creates the training configuration YAML file for LLaMA Factory.
+
+    Args:
+        args: Namespace object containing configuration arguments (simulating argparse results).
+        dataset_files: Dictionary containing paths to 'train' and optionally 'val' dataset files.
+                       Used here primarily to check if a validation set exists.
+        deepspeed_config: Path to the DeepSpeed configuration file, if used.
+
+    Returns:
+        Path to the created training configuration YAML file.
+    """
 
     logger.info("Creating training configuration")
-    
+
     # Start with the base configuration from config.py
+    # Ensure config.LLAMAFACTORY_TRAINING_CONFIG exists and is imported
     training_config = copy.deepcopy(config.LLAMAFACTORY_TRAINING_CONFIG)
-    
-    # Update configuration with command-line arguments
+
+    # Update configuration with command-line arguments (simulated via args object)
     training_config.update({
         "model_name_or_path": args.model_name_or_path,
         "output_dir": args.output_dir,
         "finetuning_type": args.finetuning_type,
+        # Template should be correctly set from config.py via the deepcopy above
         "cutoff_len": args.cutoff_len,
         "max_samples": args.max_samples,
         "per_device_train_batch_size": args.batch_size,
@@ -248,21 +262,28 @@ def create_training_config(args, dataset_files, deepspeed_config: Optional[str] 
         "resume_from_checkpoint": args.resume_from_checkpoint,
         "bf16": args.bf16,
         "fp16": args.fp16,
+        # Add dataset_dir from args/config to ensure llamafactory knows where to look
+        "dataset_dir": args.dataset_dir # Make sure this is passed correctly
     })
-    
+
+
     # Define dataset based on validation split
-    if "val" in dataset_files:
+    # Use the names defined in your dataset_info.json
+    if "val" in dataset_files: # Check if validation file was created
         training_config.update({
-            "dataset": f"custom:{dataset_files['train']}",
-            "eval_dataset": f"custom:{dataset_files['val']}",
+            # --- MODIFIED LINE: Use dataset NAME ---
+            "dataset": "telugu_train",
+            # --- MODIFIED LINE: Use dataset NAME ---
+            "eval_dataset": "telugu_val",
             "val_size": 0  # Since we're explicitly providing a validation dataset
         })
     else:
         training_config.update({
-            "dataset": f"custom:{dataset_files['train']}",
+            # --- MODIFIED LINE: Use dataset NAME ---
+            "dataset": "telugu_train", # Assuming train always exists if no val
             "val_size": 0  # No validation
         })
-    
+
     # Add LoRA configuration if using LoRA
     if args.finetuning_type in ["lora", "qlora"]:
         training_config.update({
@@ -271,37 +292,50 @@ def create_training_config(args, dataset_files, deepspeed_config: Optional[str] 
             "lora_dropout": args.lora_dropout,
             "lora_target": config.LORA_CONFIG["lora_target"]
         })
-    
+
     # Add quantization configuration if using QLoRA
     if args.finetuning_type == "qlora":
-        if args.quantization_bit is None:
-            raise ValueError("quantization_bit must be specified if finetuning_type is qlora")
-        
+        quant_bit = args.quantization_bit if hasattr(args, 'quantization_bit') and args.quantization_bit is not None else config.QLORA_CONFIG.get("quantization_bit")
+        if quant_bit is None:
+            raise ValueError("quantization_bit must be specified for qlora, either via args or config.py")
         training_config.update({
-            "quantization_bit": args.quantization_bit,
+            "quantization_bit": quant_bit,
             "quantization_method": config.QLORA_CONFIG["quantization_method"]
         })
-    
+
     # Add DeepSpeed configuration if using DeepSpeed
     if deepspeed_config:
         training_config["deepspeed"] = deepspeed_config
-    
+
     # Flash Attention
     if args.use_flash_attn:
         training_config["flash_attn"] = "fa2"
-    
+
     # Weights & Biases logging
-    if args.no_wandb and "report_to" in training_config:
-        del training_config["report_to"]
-        del training_config["run_name"]
-    
+    use_no_wandb = args.no_wandb if hasattr(args, 'no_wandb') else config.NO_WANDB
+    if use_no_wandb and "report_to" in training_config:
+        if "report_to" in training_config:
+            del training_config["report_to"]
+        if "run_name" in training_config:
+            del training_config["run_name"]
+
     # Save configuration
-    os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
-    config_path = os.path.join(os.path.dirname(args.output_dir), "train_config.yaml")
-    with open(config_path, 'w') as f:
-        yaml.dump(training_config, f, default_flow_style=False)
-    
-    logger.info(f"Created training configuration at {config_path}")
+    config_dir = os.path.dirname(args.output_dir)
+    if config_dir and not os.path.exists(config_dir):
+         os.makedirs(config_dir, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
+    config_path = os.path.join(config_dir, "train_config.yaml")
+    if not config_dir:
+        config_path = "train_config.yaml"
+
+    try:
+        with open(config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(training_config, f, default_flow_style=False, allow_unicode=True)
+        logger.info(f"Created training configuration at {config_path}")
+    except Exception as e:
+        logger.error(f"Failed to save training configuration to {config_path}: {e}")
+        raise
+
     return config_path
 
 def run_training(config_path: str, use_deepspeed: bool) -> None:
@@ -312,7 +346,8 @@ def run_training(config_path: str, use_deepspeed: bool) -> None:
     
     if use_deepspeed:
         os.environ["FORCE_TORCHRUN"] = "1"
-        logger.info("Using DeepSpeed for training")
+        os.environ["DISABLE_VERSION_CHECK"] = "1"
+        logger.info("Using DeepSpeed for training and disabling version check")
     
     # Set CUDA_VISIBLE_DEVICES if specified in config
     if config.CUDA_VISIBLE_DEVICES is not None:

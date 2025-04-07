@@ -1,0 +1,62 @@
+.
+├── README.md
+├── __pycache__
+│   └── config.cpython-39.pyc
+├── config.py
+├── config.yaml
+├── config.yaml.example
+├── details.json
+├── ds_config_zero3.json
+├── finetune_llm.py
+├── flush_gpu.py
+├── generate_config.py
+├── llama_factory
+│   ├── Readme.md
+│   ├── app.py
+│   ├── config.py
+│   ├── data
+│   │   ├── dataset_info.json
+│   │   ├── telugu_train.json
+│   │   └── telugu_val.json
+│   ├── data.py
+│   ├── eval.py
+│   ├── finetune.py
+│   ├── finetune.sh
+│   ├── mix_data.py
+│   ├── telugu.json
+│   ├── telugu_final.json
+│   ├── telugu_results.json
+│   ├── token_count.py
+│   └── tokenizer_cache
+│       └── models--google--gemma-3-12b-pt
+│           ├── refs
+│           │   └── main
+│           └── snapshots
+│               └── 295efb63d01a7017928f273a94ebb86105c9526f
+│                   ├── added_tokens.json
+│                   ├── special_tokens_map.json
+│                   ├── tokenizer.json
+│                   ├── tokenizer.model
+│                   └── tokenizer_config.json
+├── prepare_data.py
+├── requirements.txt
+├── test_template.py
+├── tree_structure.txt
+└── unsloth_version
+    ├── README.md
+    ├── config.yaml
+    ├── config_loader.py
+    ├── ds_config.json
+    ├── finetune_gemma3_telugu.py
+    ├── inference.py
+    ├── run.sh
+    ├── telugu_results.json
+    └── tests
+        ├── inference.log
+        ├── inference_tests.py
+        ├── prompts.json
+        ├── push_to_huggi.sh
+        ├── simple_inference.py
+        └── tests.sh
+
+11 directories, 49 files

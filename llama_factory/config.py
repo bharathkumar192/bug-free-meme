@@ -67,7 +67,7 @@ WANDB_API_KEY = "bc746fafa585f61730cdfd3c8226492c777f875a"
 MODEL_NAME_OR_PATH = "google/gemma-3-12b-pt"
 
 # Template to use for formatting prompts
-MODEL_TEMPLATE = "gemma3"
+MODEL_TEMPLATE = "gemma"
 
 # Whether to trust remote code
 TRUST_REMOTE_CODE = True
@@ -80,7 +80,7 @@ TRUST_REMOTE_CODE = True
 # Example: "0,1,2,3" to use first 4 GPUs
 CUDA_VISIBLE_DEVICES = None
 
-# Use Flash Attention 2 for faster training
+# Use Flash Attention 2 for faster training (Google Suggests to not use Flash Attn. Setting it false is defaulting for Eager Attn.)
 USE_FLASH_ATTN = True
 
 # Precision settings (choose one)
@@ -132,8 +132,8 @@ TRAINING_CONFIG = {
     
     # Logging and checkpointing
     "logging_steps": 50,
-    "save_steps": 100,
-    "eval_steps": 100,
+    "save_steps": 50,
+    "eval_steps": 50,
     "plot_loss": True,
     "overwrite_output_dir": True,
     "save_safetensors": True,
