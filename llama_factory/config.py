@@ -19,7 +19,8 @@ from pathlib import Path
 INPUT_FILE = "telugu_final.json"
 
 # Directory to save model and checkpoints
-OUTPUT_DIR = "./gemma3-telugu-output"
+# OUTPUT_DIR = "./gemma3-telugu-output"
+OUTPUT_DIR = "./checkpoints/gemma3-telugu-output"
 
 # Directory to save processed dataset
 DATASET_DIR = "./data"
@@ -132,8 +133,8 @@ TRAINING_CONFIG = {
     
     # Logging and checkpointing
     "logging_steps": 50,
-    "save_steps": 50,
-    "eval_steps": 50,
+    "save_steps": 75,
+    "eval_steps": 75,
     "plot_loss": True,
     "overwrite_output_dir": True,
     "save_safetensors": True,

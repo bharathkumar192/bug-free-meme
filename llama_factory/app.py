@@ -40,12 +40,13 @@ image = (
     # Add HF_TOKEN and WANDB_API_KEY
     .env({"HF_TOKEN": "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"})
     .env({"WANDB_API_KEY": "bc746fafa585f61730cdfd3c8226492c777f875a"})
-    .add_local_dir("/Users/yuvasaiveeravalli/Downloads/bug-free-meme/llama_factory", remote_path="/training", copy=True)
+    .add_local_dir("C:/Users/bhara/OneDrive/Documents/hindi_LLM/Gemini_dataset/training_files/llama_factory", remote_path="/training", copy=True)
 )
 
 # Create volumes for caching models and storing training artifacts
 hf_cache_vol = modal.Volume.from_name("hf-cache", create_if_missing=True)
 training_vol = modal.Volume.from_name("gemma-telugu-training", create_if_missing=True)
+output_vol = modal.Volume.from_name("gemma-telugu-output-vol", create_if_missing=True)
 
 # Create the Modal app
 app = modal.App("gemma-telugu-finetuning", image=image)
@@ -58,16 +59,19 @@ def import_module_from_path(module_name, file_path):
     spec.loader.exec_module(module)
     return module
 
+
+
+# Request 8 A100 80GB GPUs
+# Request 6 H100 GPUs
 @app.function(
-    gpu="A100-80GB:8",  # Request 8 A100 80GB GPUs
+    gpu="H100:8",  
     timeout=60*60*24,   # 24-hour timeout for long training
     volumes={
         "/root/.cache/huggingface": hf_cache_vol,
+        "/checkpoints": output_vol  
     },
-    memory=32384, # Increased memory
+    memory=128384, # Increased memory
 )
-
-
 def run_finetune():
     """Runs the finetune.py functionality directly without using the shell script."""
     base_training_dir = Path("/training")
