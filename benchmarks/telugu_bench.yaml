@@ -1,0 +1,55 @@
+# Custom Telugu Benchmark Configuration (task.yaml)
+# Place this file in lm-evaluation-harness/lm_eval/tasks/custom/
+
+# Telugu Cultural Context Task
+telugu_cultural:
+  group: telugu_benchmark
+  task: generate_until
+  dataset_path: ai4bharat/MILU
+  dataset_name: te_cultural
+  output_type: generate_until
+  doc_to_text: "In Telugu, answer the following question about Telugu culture: {{prompt}}"
+  doc_to_target: "{{response}}"
+  generation_kwargs:
+    until:
+      - "\n\n"
+    max_gen_toks: 512
+
+# Telugu Grammar Correction Task
+telugu_grammar:
+  group: telugu_benchmark
+  task: generate_until
+  output_type: generate_until
+  dataset_uri: https://huggingface.co/datasets/ai4bharat/MILU
+  dataset_name: te_general
+  doc_to_text: "Correct the grammar in the following Telugu text:\n\n{{prompt}}\n\nCorrected text:"
+  doc_to_target: "{{response}}"
+  description: "Grammar correction task for Telugu language"
+  fewshot_config:
+    num_fewshot: 5
+    pool_size: 5
+  generation_kwargs:
+    until:
+      - "\n\n"
+    max_gen_toks: 256
+
+# Multi-turn Telugu Conversation Task
+telugu_conversation:
+  group: telugu_benchmark
+  task: generate_until
+  output_type: generate_until
+  dataset_uri: ./custom_datasets/telugu_conversations.json  # Create your own dataset
+  description: "Multi-turn conversation task in Telugu"
+  doc_to_text: |
+    The following is a conversation in Telugu between a helpful assistant and a user.
+    
+    {{conversation}}
+    
+    User: {{input}}
+    Assistant:
+  doc_to_target: "{{response}}"
+  generation_kwargs:
+    until:
+      - "\n\nUser:"
+      - "\n\n"
+    max_gen_toks: 512
