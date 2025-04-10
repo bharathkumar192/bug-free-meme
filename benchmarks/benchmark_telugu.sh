@@ -41,16 +41,16 @@ class IndicSentimentTelugu(ConfigurableTask):
             "doc_to_target": lambda x: ["Positive", "Negative", "Neutral"].index(x["LABEL"]),
             "doc_to_choice": lambda x: ["Positive", "Negative", "Neutral"],
             "metrics": [
-                "accuracy",           # Percentage of correct predictions
-                "f1",                 # F1 score (harmonic mean of precision and recall)
-                "f1_macro",           # Macro-averaged F1 across all classes
-                "f1_micro",           # Micro-averaged F1 across all classes
-                "precision",          # Precision score
-                "recall",             # Recall score
-                "mcc",                # Matthews Correlation Coefficient
-                "confusion_matrix"    # Generates a confusion matrix for analysis
+                "accuracy",
+                "f1",
+                "f1_macro",
+                "f1_micro",
+                "precision",
+                "recall",
+                "mcc",
+                "confusion_matrix"
             ],
-            "split": "test"  # Use the test split
+            "split": "test"
         }
 
 @register_task("mmlu_te")
@@ -60,12 +60,12 @@ class MMLUTelugu(ConfigurableTask):
             "description": "Telugu version of the MMLU benchmark",
             "group": "telugu_benchmarks",
             "dataset_path": "sarvamai/mmlu-indic",
-            "dataset_filter": lambda x: x["language"] == "te",  # Filter for Telugu only
-            "dataset_preprocessing": lambda dataset: self._sample_stratified(dataset, 1000),  # Take 1000 stratified samples
+            "dataset_filter": lambda x: x["language"] == "te",
+            "dataset_preprocessing": lambda dataset: self._sample_stratified(dataset, 1000),
             "output_type": "multiple_choice",
             "doc_to_text": lambda x: f"{x['question']}\n\nA. {x['choices'][0]}\nB. {x['choices'][1]}\nC. {x['choices'][2]}\nD. {x['choices'][3]}\n\nAnswer:",
             "doc_to_target": lambda x: x["answer"],
-            "doc_to_choice": lambda x: ["A", "B", "C", "D"],
+            "doc_to_choice": ["A", "B", "C", "D"],
             "metrics": ["accuracy", "group_accuracy", "mc_correct_ratio", "calibration", "perplexity"],
             "split": "test"
         }
@@ -73,11 +73,9 @@ class MMLUTelugu(ConfigurableTask):
     def _sample_stratified(self, dataset, n_samples):
         """Sample stratified by subject if available, otherwise random sample."""
         if "subject" in dataset.features:
-            # Get all unique subjects
             subjects = dataset.unique("subject")
             samples_per_subject = max(1, n_samples // len(subjects))
 
-            # Sample from each subject
             sampled_datasets = []
             for subject in subjects:
                 subject_dataset = dataset.filter(lambda x: x["subject"] == subject)
@@ -86,10 +84,8 @@ class MMLUTelugu(ConfigurableTask):
                 else:
                     sampled_datasets.append(subject_dataset)
 
-            # Combine all samples
             return datasets.concatenate_datasets(sampled_datasets)
         else:
-            # If no subject field, just take a random sample
             if len(dataset) > n_samples:
                 return dataset.select(range(n_samples))
             return dataset
@@ -97,25 +93,30 @@ EOL
 
 # Step 4: Install the package with dependencies (AFTER creating custom tasks)
 echo "Step 4: Installing/Re-installing dependencies (to include custom tasks)..."
-pip install -e ".[multilingual]"
+python3 -m pip install -e ".[multilingual]"
 
 # Step 5: Run benchmarks
 echo "Step 5: Running benchmarks..."
 OUTPUT_DIR="../telugu_benchmark_results"
 mkdir -p "$OUTPUT_DIR"
 
-lm_eval --model hf \
+MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic" # It's good to define this at the top
+BATCH_SIZE=32 # And this
+
+lm_eval \
+    --model hf \
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
     --tasks indic_sentiment_te \
     --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/indic_sentiment_results.json" \
+    --output_path "$OUTPUT_DIR/indic_sentiment_results_indic_sentiment.json" \
     --log_samples
 
-lm_eval --model hf \
+lm_eval \
+    --model hf \
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
     --tasks mmlu_te \
     --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/mmlu_results.json" \
+    --output_path "$OUTPUT_DIR/mmlu_results_mmlu.json" \
     --log_samples
 
 echo "All benchmarks completed. Results saved to $OUTPUT_DIR"
