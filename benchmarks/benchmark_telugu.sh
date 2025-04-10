@@ -97,34 +97,34 @@ echo "Step 4: Installing/Re-installing dependencies (to include custom tasks)...
 python3 -m pip install -e ".[multilingual]" --no-cache-dir
 
 # Step 5: Run benchmarks
-echo "Step 5: Running benchmarks..."
+echo "Step 5: Running benchmarks with accelerate (2 GPUs)..."
 OUTPUT_DIR="../telugu_benchmark_results"
 mkdir -p "$OUTPUT_DIR"
 echo "lm-harness tasks declared are : "
 python -m lm_eval --tasks list --verbosity DEBUG
 
-
-MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic" # It's good to define this at the top
-BATCH_SIZE=32 # And this
+MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
+BATCH_SIZE=32
 export PYTHONPATH="$PYTHONPATH:$CUSTOM_TASKS_PATH"
 
-python -m lm_eval \
+# Run IndicSentiment benchmark with accelerate
+echo "Running IndicSentiment benchmark..."
+accelerate launch --num_processes=2 -m lm_eval \
     --model hf \
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
     --tasks indic_sentiment_te \
     --batch_size "$BATCH_SIZE" \
-    --parallelize=True \
     --output_path "$OUTPUT_DIR/indic_sentiment_results_indic_sentiment.json" \
     --log_samples \
     --include_path "$CUSTOM_TASKS_PATH"
 
-export PYTHONPATH="$PYTHONPATH:$CUSTOM_TASKS_PATH"
-python -m lm_eval \
+# Run MMLU benchmark with accelerate
+echo "Running MMLU benchmark..."
+accelerate launch --num_processes=2 -m lm_eval \
     --model hf \
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
     --tasks mmlu_te \
     --batch_size "$BATCH_SIZE" \
-    --parallelize=True \
     --output_path "$OUTPUT_DIR/mmlu_results_mmlu.json" \
     --log_samples \
     --include_path "$CUSTOM_TASKS_PATH"
