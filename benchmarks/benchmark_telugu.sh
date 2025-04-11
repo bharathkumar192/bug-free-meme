@@ -1,12 +1,11 @@
+# Modify your script to ensure proper Python module path handling
 #!/bin/bash
 # Complete Setup and Benchmarking Script for Telugu Language Model Evaluation
-# This script handles everything from installation to running benchmarks
 
 set -e  # Exit on any error
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
-CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom)
 
 # Step 1: Clone LM Evaluation Harness
 echo "Step 1: Cloning LM Evaluation Harness repository..."
@@ -15,13 +14,21 @@ if [ ! -d "$LM_EVAL_DIR" ]; then
 fi
 cd "$LM_EVAL_DIR"
 
-# Step 2: Create directory for custom tasks
+# Step 2: Create directory for custom tasks with proper Python package structure
 echo "Step 2: Setting up custom task directory..."
 mkdir -p lm_eval/tasks/custom
 touch lm_eval/tasks/custom/__init__.py
-echo "from . import telugu_tasks" > lm_eval/tasks/custom/__init__.py
 
-# Step 3: Create custom task definition file (using the provided content)
+# Create proper import in __init__.py
+cat > lm_eval/tasks/custom/__init__.py << 'EOL'
+# This makes the custom directory a proper Python package
+try:
+    from . import telugu_tasks
+except ImportError:
+    print("Warning: Could not import telugu_tasks module.")
+EOL
+
+# Step 3: Create custom task definition file
 echo "Step 3: Creating custom task definitions in lm_eval/tasks/custom/telugu_tasks.py..."
 cat > lm_eval/tasks/custom/telugu_tasks.py << 'EOL'
 from lm_eval.api.task import ConfigurableTask
@@ -92,20 +99,24 @@ class MMLUTelugu(ConfigurableTask):
             return dataset
 EOL
 
-# Step 4: Install the package with dependencies (AFTER creating custom tasks)
+# Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies (to include custom tasks)..."
-python3 -m pip install -e ".[multilingual]" --no-cache-dir
+pip install -e ".[multilingual]" --no-cache-dir
 
-# Step 5: Run benchmarks
-echo "Step 5: Running benchmarks with accelerate (2 GPUs)..."
+# Step 5: First, verify the tasks are registered
+echo "Checking available tasks..."
+python -m lm_eval --tasks list --verbosity DEBUG
+
+# Step 6: Run benchmarks
+echo "Step 5: Running benchmarks with accelerate..."
 OUTPUT_DIR="../telugu_benchmark_results"
 mkdir -p "$OUTPUT_DIR"
-echo "lm-harness tasks declared are : "
-python -m lm_eval --tasks list --verbosity DEBUG
 
 MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
 BATCH_SIZE=32
-export PYTHONPATH="$PYTHONPATH:$CUSTOM_TASKS_PATH"
+
+# Critical fix: Use --include_path to specify the custom tasks directory
+TASKS_DIR=$(pwd)/lm_eval/tasks/custom
 
 # Run IndicSentiment benchmark with accelerate
 echo "Running IndicSentiment benchmark..."
@@ -114,9 +125,10 @@ accelerate launch --num_processes=2 -m lm_eval \
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
     --tasks indic_sentiment_te \
     --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/indic_sentiment_results_indic_sentiment.json" \
+    --output_path "$OUTPUT_DIR/indic_sentiment_results.json" \
     --log_samples \
-    --include_path "$CUSTOM_TASKS_PATH"
+    --include_path "$TASKS_DIR" \
+    --verbosity DEBUG
 
 # Run MMLU benchmark with accelerate
 echo "Running MMLU benchmark..."
@@ -125,14 +137,9 @@ accelerate launch --num_processes=2 -m lm_eval \
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
     --tasks mmlu_te \
     --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/mmlu_results_mmlu.json" \
+    --output_path "$OUTPUT_DIR/mmlu_results.json" \
     --log_samples \
-    --include_path "$CUSTOM_TASKS_PATH"
+    --include_path "$TASKS_DIR" \
+    --verbosity DEBUG
 
 echo "All benchmarks completed. Results saved to $OUTPUT_DIR"
-
-# Step 6: Instructions for finding results (adjusted path)
-echo ""
-echo "After benchmarking, find your results in the ../telugu_benchmark_results directory."
-echo "You can copy them back to your local machine using:"
-echo "scp -r user@your-server:path/to/bug-free-meme/telugu_benchmark_results ."
