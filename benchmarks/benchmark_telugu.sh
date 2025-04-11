@@ -103,7 +103,8 @@ echo "Step 6: Running benchmarks with accelerate..."
 OUTPUT_DIR="../telugu_benchmark_results" # Results saved outside the git repo
 mkdir -p "$OUTPUT_DIR"
 
-MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
+# MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
+MODEL_PATH="krutrim-ai-labs/Krutrim-2-instruct"
 BATCH_SIZE=auto # Starting with 8, adjust if needed.
 CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom) # Get absolute path
 
