@@ -6,7 +6,7 @@ set -e  # Exit on any error
 
 # Login to Hugging Face
 echo "Logging in to Hugging Face..."
-# echo "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" | huggingface-cli login
+echo "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" | huggingface-cli login
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
@@ -27,12 +27,22 @@ echo "# Custom tasks for Telugu benchmark" > lm_eval/tasks/custom/__init__.py
 # Step 3: Create YAML task definitions
 echo "Step 3: Creating custom task YAML definitions..."
 
+# Create a group YAML file for telugu benchmarks
+cat > lm_eval/tasks/custom/telugu_benchmarks.yaml << 'EOL'
+group: telugu_benchmarks
+group_alias: Telugu Language Benchmarks
+task:
+  - task: indic_sentiment_te
+    task_alias: Telugu Sentiment Analysis
+    num_fewshot: 0
+  - task: mmlu_te
+    task_alias: Telugu MMLU
+    num_fewshot: 5
+EOL
+
 # Create IndicSentiment Telugu YAML
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
-# IndicSentiment Telugu Evaluation
 task: indic_sentiment_te
-group: telugu_benchmarks
-description: Telugu sentiment analysis from IndicSentiment dataset
 dataset_path: ai4bharat/IndicSentiment
 dataset_name: te
 output_type: multiple_choice
@@ -43,21 +53,23 @@ doc_to_text: |
 doc_to_target: "{LABEL}"
 doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
-  - accuracy
-  - f1_macro
-  - f1_micro
-  - precision
-  - recall
-  - mcc
+  - metric: accuracy
+    aggregation: mean
+    higher_is_better: true
+  - metric: f1_macro
+    aggregation: mean
+    higher_is_better: true
+  - metric: f1_micro
+    aggregation: mean
+    higher_is_better: true
 split: test
+metadata:
+  version: 1.0
 EOL
 
 # Create MMLU Telugu YAML
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
-# MMLU Telugu Evaluation
 task: mmlu_te
-group: telugu_benchmarks
-description: Telugu version of the MMLU benchmark
 dataset_path: sarvamai/mmlu-indic
 dataset_filter: "language == 'te'"
 output_type: multiple_choice
@@ -73,10 +85,18 @@ doc_to_text: |
 doc_to_target: "{answer}"
 doc_to_choice: ["A", "B", "C", "D"]
 metric_list:
-  - accuracy
-  - group_accuracy
-  - mc_correct_ratio
+  - metric: accuracy
+    aggregation: mean
+    higher_is_better: true
+  - metric: group_accuracy
+    aggregation: mean
+    higher_is_better: true
 split: test
+fewshot_split: test
+fewshot_config:
+  sampler: random
+metadata:
+  version: 1.0
 EOL
 
 # Step 4: Install the package with dependencies
@@ -96,26 +116,14 @@ MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
 BATCH_SIZE=32
 CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom)
 
-# Run IndicSentiment benchmark with accelerate
-echo "Running IndicSentiment benchmark..."
+# Run the entire benchmark group
+echo "Running Telugu benchmarks..."
 accelerate launch --num_processes=2 -m lm_eval \
     --model hf \
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
-    --tasks indic_sentiment_te \
+    --tasks telugu_benchmarks \
     --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/indic_sentiment_results.json" \
-    --log_samples \
-    --include_path "$CUSTOM_TASKS_PATH" \
-    --verbosity DEBUG
-
-# Run MMLU benchmark with accelerate
-echo "Running MMLU benchmark..."
-accelerate launch --num_processes=2 -m lm_eval \
-    --model hf \
-    --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
-    --tasks mmlu_te \
-    --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/mmlu_results.json" \
+    --output_path "$OUTPUT_DIR/telugu_benchmarks_results.json" \
     --log_samples \
     --include_path "$CUSTOM_TASKS_PATH" \
     --verbosity DEBUG
