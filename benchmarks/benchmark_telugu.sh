@@ -33,7 +33,7 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (Using Jinja bracket notation for keys with spaces/uppercase)
+# Create indic_sentiment_te.yaml (Using direct Jinja bracket notation for top-level keys)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
 task: indic_sentiment_te
@@ -44,9 +44,9 @@ dataset_kwargs:
 output_type: multiple_choice
 test_split: test
 num_fewshot: 0
-# Corrected Jinja2 access using bracket notation for keys with spaces/uppercase
-doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ doc['INDIC REVIEW'] }}" 
-doc_to_target: "{{ doc['LABEL'] }}" 
+# Corrected Jinja2 access using direct bracket notation on keys
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ ['INDIC REVIEW'] }}" 
+doc_to_target: "{{ ['LABEL'] }}" 
 doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
   - metric: acc
@@ -56,7 +56,7 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (No changes needed here, assuming standard keys)
+# Create mmlu_te.yaml (No changes needed here, assuming standard keys like 'question', 'answer')
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
 task: mmlu_te
