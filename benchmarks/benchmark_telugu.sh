@@ -24,79 +24,52 @@ mkdir -p lm_eval/tasks/custom
 touch lm_eval/tasks/custom/__init__.py
 echo "# Custom tasks for Telugu benchmark" > lm_eval/tasks/custom/__init__.py
 
-# Step 3: Create YAML task definitions
-echo "Step 3: Creating custom task YAML definitions..."
+# Step 3: Create custom Python task definitions instead of YAML
+echo "Step 3: Creating custom task Python definitions..."
 
-# Create a group YAML file for telugu benchmarks
-cat > lm_eval/tasks/custom/telugu_benchmarks.yaml << 'EOL'
-group: telugu_benchmarks
-group_alias: Telugu Language Benchmarks
-task:
-  - task: indic_sentiment_te
-    task_alias: Telugu Sentiment Analysis
-    num_fewshot: 0
-  - task: mmlu_te
-    task_alias: Telugu MMLU
-    num_fewshot: 5
+# Create a Python file with the task definitions
+cat > lm_eval/tasks/custom/telugu_tasks.py << 'EOL'
+from lm_eval.api.task import ConfigurableTask
+from lm_eval.api.registry import register_task
+import datasets
+
+@register_task("indic_sentiment_te")
+class IndicSentimentTelugu(ConfigurableTask):
+    def get_config(self):
+        return {
+            "description": "Telugu sentiment analysis from IndicSentiment dataset",
+            "dataset_path": "ai4bharat/IndicSentiment",
+            "dataset_name": "te",
+            "output_type": "multiple_choice",
+            "doc_to_text": lambda x: f"Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{x['INDIC REVIEW']}",
+            "doc_to_target": lambda x: ["Positive", "Negative", "Neutral"].index(x["LABEL"]),
+            "doc_to_choice": lambda x: ["Positive", "Negative", "Neutral"],
+            "metrics": ["accuracy", "f1_macro", "f1_micro", "precision", "recall", "mcc"]
+        }
+
+@register_task("mmlu_te")
+class MMLUTelugu(ConfigurableTask):
+    def get_config(self):
+        return {
+            "description": "Telugu version of the MMLU benchmark",
+            "dataset_path": "sarvamai/mmlu-indic",
+            "dataset_filter": lambda x: x["language"] == "te",
+            "output_type": "multiple_choice",
+            "doc_to_text": lambda x: f"{x['question']}\n\nA. {x['choices'][0]}\nB. {x['choices'][1]}\nC. {x['choices'][2]}\nD. {x['choices'][3]}\n\nAnswer:",
+            "doc_to_target": lambda x: ["A", "B", "C", "D"].index(x["answer"]),
+            "doc_to_choice": lambda x: ["A", "B", "C", "D"],
+            "metrics": ["accuracy"]
+        }
 EOL
 
-# Create IndicSentiment Telugu YAML
-cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
-task: indic_sentiment_te
-dataset_path: ai4bharat/IndicSentiment
-dataset_name: te
-output_type: multiple_choice
-doc_to_text: |
-  Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:
-
-  {INDIC REVIEW}
-doc_to_target: "{LABEL}"
-doc_to_choice: ["Positive", "Negative", "Neutral"]
-metric_list:
-  - metric: accuracy
-    aggregation: mean
-    higher_is_better: true
-  - metric: f1_macro
-    aggregation: mean
-    higher_is_better: true
-  - metric: f1_micro
-    aggregation: mean
-    higher_is_better: true
-split: test
-metadata:
-  version: 1.0
-EOL
-
-# Create MMLU Telugu YAML
-cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
-task: mmlu_te
-dataset_path: sarvamai/mmlu-indic
-dataset_filter: "language == 'te'"
-output_type: multiple_choice
-doc_to_text: |
-  {question}
-
-  A. {choices[0]}
-  B. {choices[1]}
-  C. {choices[2]}
-  D. {choices[3]}
-
-  Answer:
-doc_to_target: "{answer}"
-doc_to_choice: ["A", "B", "C", "D"]
-metric_list:
-  - metric: accuracy
-    aggregation: mean
-    higher_is_better: true
-  - metric: group_accuracy
-    aggregation: mean
-    higher_is_better: true
-split: test
-fewshot_split: test
-fewshot_config:
-  sampler: random
-metadata:
-  version: 1.0
+# Update the __init__.py to import the tasks
+cat > lm_eval/tasks/custom/__init__.py << 'EOL'
+# Import the custom Telugu tasks
+try:
+    from . import telugu_tasks
+    print("Successfully imported Telugu tasks!")
+except ImportError as e:
+    print(f"Error importing Telugu tasks: {e}")
 EOL
 
 # Step 4: Install the package with dependencies
@@ -115,6 +88,9 @@ mkdir -p "$OUTPUT_DIR"
 MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
 BATCH_SIZE=32
 CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom)
+
+# Add the custom path to PYTHONPATH
+export PYTHONPATH="$PYTHONPATH:$(realpath .)"
 
 # Run IndicSentiment benchmark with standard accelerate launch
 echo "Running IndicSentiment benchmark..."
