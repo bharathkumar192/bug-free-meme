@@ -33,62 +33,55 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml
+# Create indic_sentiment_te.yaml (NO 'group' key)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
-group: 
-  - custom_telugu_tasks # Optional grouping
-task: indic_sentiment_te
+task: indic_sentiment_te # Task name is the primary identifier
 dataset_path: ai4bharat/IndicSentiment
 dataset_name: te
-output_type: multiple_choice # Model needs to choose from the provided choices
-training_split: train # Specify the split for training data if needed (e.g., for fewshot)
-test_split: test      # Specify the split for evaluation
-# validation_split: # Not specified in original code
-doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{INDIC REVIEW}}" # Jinja2 template for the input prompt
-doc_to_target: "{{LABEL}}" # Jinja2 template for the correct label column
-doc_to_choice: ["Positive", "Negative", "Neutral"] # Explicit list of choices
+output_type: multiple_choice
+training_split: train
+test_split: test
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{INDIC REVIEW}}"
+doc_to_target: "{{LABEL}}"
+doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
-  - metric: acc # Standard accuracy for multiple choice
+  - metric: acc
     aggregation: mean
     higher_is_better: true
 metadata:
-  version: 1.0 # Versioning for the task definition
+  version: 1.0
 EOL
 
-# Create mmlu_te.yaml
+# Create mmlu_te.yaml (NO 'group' key)
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
-group: 
-  - custom_telugu_tasks # Optional grouping
-task: mmlu_te
-dataset_path: sarvamai/mmlu-indic # Dataset containing Telugu MMLU
-# dataset_name: # Optional: if the dataset has specific configurations/subsets
-output_type: multiple_choice # Model needs to choose from A, B, C, D
-test_split: test # Specify the split for evaluation
-# fewshot_split: # Define if you want few-shot examples from a different split (e.g., 'validation' or 'train')
-# num_fewshot: 0 # Explicitly set to 0 if no few-shot examples are desired (default is often 0)
+task: mmlu_te # Task name is the primary identifier
+dataset_path: sarvamai/mmlu-indic
+output_type: multiple_choice
+test_split: test
 
-# Optional Filter: Uncomment and adjust if the dataset contains multiple languages
+# Optional Filter: Uncomment and adjust if needed
 # filter_list:
 #  - name: "filter_language_telugu"
 #    filter:
-#      - function: "regex" # Use regex to match language code
-#        inputs: "language" # Replace "language" with the actual column name containing the language identifier
-#        regex_pattern: "^te$" # Match 'te' exactly
+#      - function: "regex"
+#        inputs: "language" # Replace with actual column name
+#        regex_pattern: "^te$"
 
-doc_to_text: "{{question}}\n\nA. {{choices[0]}}\nB. {{choices[1]}}\nC. {{choices[2]}}\nD. {{choices[3]}}\n\nAnswer:" # Jinja2 template for the question and choices
-doc_to_target: "{{answer}}" # Jinja2 template for the correct answer column (expecting A, B, C, or D)
-doc_to_choice: ["A", "B", "C", "D"] # Explicit list of choices
+doc_to_text: "{{question}}\n\nA. {{choices[0]}}\nB. {{choices[1]}}\nC. {{choices[2]}}\nD. {{choices[3]}}\n\nAnswer:"
+doc_to_target: "{{answer}}"
+doc_to_choice: ["A", "B", "C", "D"]
 metric_list:
-  - metric: acc # Standard accuracy for multiple choice
+  - metric: acc
     aggregation: mean
     higher_is_better: true
 metadata:
-  version: 1.0 # Versioning for the task definition
+  version: 1.0
 EOL
 
 echo "Custom YAML task files created."
+
 
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
