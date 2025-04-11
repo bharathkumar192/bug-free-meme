@@ -1,0 +1,19 @@
+# Using dataset details from your Python class
+group: 
+  - custom_telugu_tasks # Optional: Define a group name
+task: indic_sentiment_te
+dataset_path: ai4bharat/IndicSentiment
+dataset_name: te
+output_type: multiple_choice # Changed based on your Python code's logic (argmax over choices)
+training_split: train
+test_split: test 
+# validation_split: # Not available in your python code, omit if not needed
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{INDIC REVIEW}}" # Use Jinja2 syntax
+doc_to_target: "{{LABEL}}"
+doc_to_choice: ["Positive", "Negative", "Neutral"] # Explicitly define choices
+metric_list:
+  - metric: acc # Use standard accuracy metric for multiple choice
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0

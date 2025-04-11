@@ -1,0 +1,23 @@
+group: 
+  - custom_telugu_tasks # Optional: Define a group name
+task: mmlu_te
+dataset_path: sarvamai/mmlu-indic # Assuming this contains the Telugu subset directly or needs filtering
+# dataset_name: # Optional: if the dataset has specific configurations
+output_type: multiple_choice # Changed based on your Python code's logic (argmax over choices)
+test_split: test # Assuming 'test' split exists and contains Telugu data
+# fewshot_split: # Not defined in your python code, add if needed for fewshot examples
+# filter_list: # Add filtering if the dataset needs it (e.g., filter by language column)
+#  - name: "filter_language"
+#    filter:
+#      - function: "regex"
+#        inputs: "language" # Column name containing language code
+#        regex_pattern: "^te$" 
+doc_to_text: "{{question}}\n\nA. {{choices[0]}}\nB. {{choices[1]}}\nC. {{choices[2]}}\nD. {{choices[3]}}\n\nAnswer:" # Use Jinja2 syntax
+doc_to_target: "{{answer}}" # Assuming 'answer' column contains 'A', 'B', 'C', or 'D'
+doc_to_choice: ["A", "B", "C", "D"] # Explicitly define choices
+metric_list:
+  - metric: acc # Use standard accuracy metric for multiple choice
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0
