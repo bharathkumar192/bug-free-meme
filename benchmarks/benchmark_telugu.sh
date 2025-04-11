@@ -95,7 +95,7 @@ echo "Custom YAML task files created."
 echo "Step 4: Installing/Re-installing dependencies..."
 # Ensure pip is up-to-date (Recommended)
 pip install --upgrade pip
-cd lm-evaluation-harness
+# cd lm-evaluation-harness
 # Install lm-eval-harness editable, including multilingual extras (CRITICAL)
 pip install -e ".[multilingual]" --no-cache-dir
 
