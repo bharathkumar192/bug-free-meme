@@ -5,9 +5,9 @@
 set -e  # Exit on any error
 
 # Login to Hugging Face (Optional - uncomment if needed)
-# echo "Logging in to Hugging Face..."
-# HUGGING_FACE_TOKEN="hf_YOUR_TOKEN_HERE"
-# echo "$HUGGING_FACE_TOKEN" | huggingface-cli login --token "$HUGGING_FACE_TOKEN"
+echo "Logging in to Hugging Face..."
+HUGGING_FACE_TOKEN="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"
+echo "$HUGGING_FACE_TOKEN" | huggingface-cli login --token "$HUGGING_FACE_TOKEN"
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
