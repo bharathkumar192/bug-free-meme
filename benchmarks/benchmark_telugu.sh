@@ -91,9 +91,9 @@ echo "Custom YAML task files created."
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
 # Ensure pip is up-to-date
-pip install --upgrade pip
+# pip install --upgrade pip
 # Install lm-eval-harness editable, including multilingual extras
-pip install -e ".[multilingual]" --no-cache-dir
+# pip install -e ".[multilingual]" --no-cache-dir
 
 # Step 5: List available tasks to verify registration
 echo "Step 5: Verifying task registration..."
