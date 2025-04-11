@@ -98,7 +98,7 @@ echo "Step 4: Installing/Re-installing dependencies..."
 # Step 5: List available tasks to verify registration
 echo "Step 5: Verifying task registration..."
 # Check if the custom tasks appear in the list
-python -m lm_eval --tasks list --verbosity INFO | grep -E 'indic_sentiment_te|mmlu_te' || echo "Custom tasks not found in list, check YAML files and paths."
+# python -m lm_eval --tasks list --verbosity INFO | grep -E 'indic_sentiment_te|mmlu_te' || echo "Custom tasks not found in list, check YAML files and paths."
 
 # Step 6: Run benchmarks
 echo "Step 6: Running benchmarks with accelerate..."
