@@ -33,17 +33,18 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (Corrected dataset_name and added dataset_kwargs)
+# Create indic_sentiment_te.yaml (Added num_fewshot: 0, removed training_split)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
 task: indic_sentiment_te
 dataset_path: ai4bharat/IndicSentiment
-dataset_name: translation-te # Corrected configuration name
-dataset_kwargs: # Added to trust remote code for dataset loading
+dataset_name: translation-te
+dataset_kwargs:
   trust_remote_code: True
 output_type: multiple_choice
-training_split: train
-test_split: test
+test_split: test      # Use the 'test' split for evaluation
+# training_split: train # Removed as 'train' split doesn't exist and not needed for zero-shot
+num_fewshot: 0        # Specify zero-shot evaluation
 doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{INDIC REVIEW}}"
 doc_to_target: "{{LABEL}}"
 doc_to_choice: ["Positive", "Negative", "Neutral"]
@@ -55,15 +56,16 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (Adding dataset_kwargs here too, just in case)
+# Create mmlu_te.yaml (Adding num_fewshot: 0 for consistency)
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
 task: mmlu_te
 dataset_path: sarvamai/mmlu-indic
-dataset_kwargs: # Added to trust remote code (good practice if needed)
-  trust_remote_code: True 
+dataset_kwargs:
+  trust_remote_code: True
 output_type: multiple_choice
 test_split: test
+num_fewshot: 0 # Explicitly set zero-shot for MMLU as well
 
 # Optional Filter: Uncomment and adjust if needed
 # filter_list:
