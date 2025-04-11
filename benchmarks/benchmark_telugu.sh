@@ -6,7 +6,7 @@ set -e  # Exit on any error
 
 # Login to Hugging Face
 echo "Logging in to Hugging Face..."
-# echo "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" | huggingface-cli login
+echo "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" | huggingface-cli login
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
@@ -116,15 +116,26 @@ MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
 BATCH_SIZE=32
 CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom)
 
-# Run the entire benchmark group
-echo "Running Telugu benchmarks..."
-accelerate launch --num_processes=2 -m lm_eval \
+# Run IndicSentiment benchmark with standard accelerate launch
+echo "Running IndicSentiment benchmark..."
+accelerate launch -m lm_eval \
     --model hf \
-    --multi_gpu
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
-    --tasks telugu_benchmarks \
+    --tasks indic_sentiment_te \
     --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/telugu_benchmarks_results.json" \
+    --output_path "$OUTPUT_DIR/indic_sentiment_results.json" \
+    --log_samples \
+    --include_path "$CUSTOM_TASKS_PATH" \
+    --verbosity DEBUG
+
+# Run MMLU benchmark with standard accelerate launch
+echo "Running MMLU benchmark..."
+accelerate launch -m lm_eval \
+    --model hf \
+    --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
+    --tasks mmlu_te \
+    --batch_size "$BATCH_SIZE" \
+    --output_path "$OUTPUT_DIR/mmlu_results.json" \
     --log_samples \
     --include_path "$CUSTOM_TASKS_PATH" \
     --verbosity DEBUG
