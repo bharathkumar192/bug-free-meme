@@ -22,54 +22,148 @@ cd "$LM_EVAL_DIR"
 echo "Step 2: Setting up custom task directory..."
 mkdir -p lm_eval/tasks/custom
 touch lm_eval/tasks/custom/__init__.py
-echo "# Custom tasks for Telugu benchmark" > lm_eval/tasks/custom/__init__.py
 
-# Step 3: Create custom Python task definitions instead of YAML
-echo "Step 3: Creating custom task Python definitions..."
+# Step 3: Create Python task definitions that don't use split parameter
+echo "Step 3: Creating custom Python task definitions..."
 
-# Create a Python file with the task definitions
+# First, check the TaskConfig class to see what parameters it accepts
+cat > check_taskconfig.py << 'EOL'
+from lm_eval.api.task import TaskConfig
+import inspect
+
+print("TaskConfig parameters:")
+print(inspect.signature(TaskConfig.__init__))
+EOL
+
+python check_taskconfig.py
+
+# Create a Python file with the minimal task definitions
 cat > lm_eval/tasks/custom/telugu_tasks.py << 'EOL'
-from lm_eval.api.task import ConfigurableTask
+from lm_eval.api.task import Task
 from lm_eval.api.registry import register_task
 import datasets
 
 @register_task("indic_sentiment_te")
-class IndicSentimentTelugu(ConfigurableTask):
-    def get_config(self):
-        return {
-            "description": "Telugu sentiment analysis from IndicSentiment dataset",
-            "dataset_path": "ai4bharat/IndicSentiment",
-            "dataset_name": "te",
-            "output_type": "multiple_choice",
-            "doc_to_text": lambda x: f"Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{x['INDIC REVIEW']}",
-            "doc_to_target": lambda x: ["Positive", "Negative", "Neutral"].index(x["LABEL"]),
-            "doc_to_choice": lambda x: ["Positive", "Negative", "Neutral"],
-            "metrics": ["accuracy", "f1_macro", "f1_micro", "precision", "recall", "mcc"]
-        }
+class IndicSentimentTelugu(Task):
+    VERSION = 1
+    DATASET_PATH = "ai4bharat/IndicSentiment"
+    DATASET_NAME = "te"
+    
+    def has_training_docs(self):
+        return True
+    
+    def has_validation_docs(self):
+        return False
+    
+    def has_test_docs(self):
+        return True
+    
+    def training_docs(self):
+        if self._training_docs is None:
+            self._training_docs = list(self.dataset["train"])
+        return self._training_docs
+    
+    def test_docs(self):
+        if self._test_docs is None:
+            self._test_docs = list(self.dataset["test"])
+        return self._test_docs
+    
+    def validation_docs(self):
+        return []
+    
+    def doc_to_text(self, doc):
+        return f"Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{doc['INDIC REVIEW']}"
+    
+    def doc_to_target(self, doc):
+        return doc["LABEL"]
+    
+    def process_results(self, docs, results):
+        preds = []
+        labels = []
+        for pred, doc in zip(results, docs):
+            pred_label = ["Positive", "Negative", "Neutral"][pred.argmax()]
+            preds.append(pred_label)
+            labels.append(doc["LABEL"])
+        
+        # Calculate accuracy
+        correct = sum(p == l for p, l in zip(preds, labels))
+        return {"accuracy": correct / len(docs)}
+    
+    def construct_requests(self, doc, ctx):
+        return [
+            {"doc": doc, "choices": ["Positive", "Negative", "Neutral"], "instruction": self.doc_to_text(doc)}
+        ]
+    
+    def doc_to_choice(self, doc):
+        return ["Positive", "Negative", "Neutral"]
+
 
 @register_task("mmlu_te")
-class MMLUTelugu(ConfigurableTask):
-    def get_config(self):
-        return {
-            "description": "Telugu version of the MMLU benchmark",
-            "dataset_path": "sarvamai/mmlu-indic",
-            "dataset_filter": lambda x: x["language"] == "te",
-            "output_type": "multiple_choice",
-            "doc_to_text": lambda x: f"{x['question']}\n\nA. {x['choices'][0]}\nB. {x['choices'][1]}\nC. {x['choices'][2]}\nD. {x['choices'][3]}\n\nAnswer:",
-            "doc_to_target": lambda x: ["A", "B", "C", "D"].index(x["answer"]),
-            "doc_to_choice": lambda x: ["A", "B", "C", "D"],
-            "metrics": ["accuracy"]
-        }
+class MMLUTelugu(Task):
+    VERSION = 1
+    DATASET_PATH = "sarvamai/mmlu-indic"
+    
+    def __init__(self):
+        super().__init__()
+        self._dataset = None
+    
+    def download(self):
+        self._dataset = datasets.load_dataset(self.DATASET_PATH)
+        # Filter for Telugu samples
+        self._dataset = self._dataset.filter(lambda x: x["language"] == "te")
+    
+    def has_training_docs(self):
+        return False
+    
+    def has_validation_docs(self):
+        return False
+    
+    def has_test_docs(self):
+        return True
+    
+    def training_docs(self):
+        return []
+    
+    def validation_docs(self):
+        return []
+    
+    def test_docs(self):
+        if self._test_docs is None:
+            self._test_docs = list(self._dataset["test"])
+        return self._test_docs
+    
+    def doc_to_text(self, doc):
+        return f"{doc['question']}\n\nA. {doc['choices'][0]}\nB. {doc['choices'][1]}\nC. {doc['choices'][2]}\nD. {doc['choices'][3]}\n\nAnswer:"
+    
+    def doc_to_target(self, doc):
+        return doc["answer"]
+    
+    def process_results(self, docs, results):
+        preds = []
+        labels = []
+        
+        for pred, doc in zip(results, docs):
+            pred_label = ["A", "B", "C", "D"][pred.argmax()]
+            preds.append(pred_label)
+            labels.append(doc["answer"])
+        
+        # Calculate accuracy
+        correct = sum(p == l for p, l in zip(preds, labels))
+        return {"accuracy": correct / len(docs)}
+    
+    def construct_requests(self, doc, ctx):
+        return [
+            {"doc": doc, "choices": ["A", "B", "C", "D"], "instruction": self.doc_to_text(doc)}
+        ]
+    
+    def doc_to_choice(self, doc):
+        return ["A", "B", "C", "D"]
 EOL
 
 # Update the __init__.py to import the tasks
 cat > lm_eval/tasks/custom/__init__.py << 'EOL'
-# Import the custom Telugu tasks
-try:
-    from . import telugu_tasks
-    print("Successfully imported Telugu tasks!")
-except ImportError as e:
-    print(f"Error importing Telugu tasks: {e}")
+from . import telugu_tasks
+print("Successfully imported Telugu tasks!")
 EOL
 
 # Step 4: Install the package with dependencies
