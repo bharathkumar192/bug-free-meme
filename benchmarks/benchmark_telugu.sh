@@ -6,7 +6,7 @@ set -e  # Exit on any error
 
 # Login to Hugging Face
 echo "Logging in to Hugging Face..."
-echo "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" | huggingface-cli login
+# echo "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" | huggingface-cli login
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
@@ -120,6 +120,7 @@ CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom)
 echo "Running Telugu benchmarks..."
 accelerate launch --num_processes=2 -m lm_eval \
     --model hf \
+    --multi_gpu
     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
     --tasks telugu_benchmarks \
     --batch_size "$BATCH_SIZE" \
