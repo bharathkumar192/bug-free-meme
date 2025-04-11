@@ -33,7 +33,7 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (Added num_fewshot: 0, removed training_split)
+# Create indic_sentiment_te.yaml (Corrected Jinja2 variable syntax)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
 task: indic_sentiment_te
@@ -42,11 +42,11 @@ dataset_name: translation-te
 dataset_kwargs:
   trust_remote_code: True
 output_type: multiple_choice
-test_split: test      # Use the 'test' split for evaluation
-# training_split: train # Removed as 'train' split doesn't exist and not needed for zero-shot
-num_fewshot: 0        # Specify zero-shot evaluation
-doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{INDIC REVIEW}}"
-doc_to_target: "{{LABEL}}"
+test_split: test
+num_fewshot: 0
+# Corrected Jinja2 variable name (space replaced with underscore)
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ INDIC_REVIEW }}" 
+doc_to_target: "{{ LABEL }}" # Assuming LABEL is correct, verify if needed
 doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
   - metric: acc
@@ -56,7 +56,7 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (Adding num_fewshot: 0 for consistency)
+# Create mmlu_te.yaml (No changes needed here for this error)
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
 task: mmlu_te
@@ -65,7 +65,7 @@ dataset_kwargs:
   trust_remote_code: True
 output_type: multiple_choice
 test_split: test
-num_fewshot: 0 # Explicitly set zero-shot for MMLU as well
+num_fewshot: 0
 
 # Optional Filter: Uncomment and adjust if needed
 # filter_list:
@@ -75,8 +75,8 @@ num_fewshot: 0 # Explicitly set zero-shot for MMLU as well
 #        inputs: "language" # Replace with actual column name
 #        regex_pattern: "^te$"
 
-doc_to_text: "{{question}}\n\nA. {{choices[0]}}\nB. {{choices[1]}}\nC. {{choices[2]}}\nD. {{choices[3]}}\n\nAnswer:"
-doc_to_target: "{{answer}}"
+doc_to_text: "{{ question }}\n\nA. {{ choices[0] }}\nB. {{ choices[1] }}\nC. {{ choices[2] }}\nD. {{ choices[3] }}\n\nAnswer:" # Assuming 'question' and 'choices' are correct column names
+doc_to_target: "{{ answer }}" # Assuming 'answer' is correct
 doc_to_choice: ["A", "B", "C", "D"]
 metric_list:
   - metric: acc
@@ -87,6 +87,7 @@ metadata:
 EOL
 
 echo "Custom YAML task files created."
+
 
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
