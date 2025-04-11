@@ -12,17 +12,17 @@ echo "$HUGGING_FACE_TOKEN" | huggingface-cli login --token "$HUGGING_FACE_TOKEN"
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
 
-# Step 1: Clone LM Evaluation Harness (or update if it exists)
-# echo "Step 1: Managing LM Evaluation Harness repository..."
-# if [ ! -d "$LM_EVAL_DIR" ]; then
-#     git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness
-#     cd "$LM_EVAL_DIR"
-# else
-#     cd "$LM_EVAL_DIR"
-#     echo "Repository exists, checking for updates..."
-#     # Optional: Consider 'git pull' if you always want the latest version
-#     # git pull
-# fi
+Step 1: Clone LM Evaluation Harness (or update if it exists)
+echo "Step 1: Managing LM Evaluation Harness repository..."
+if [ ! -d "$LM_EVAL_DIR" ]; then
+    git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness
+    cd "$LM_EVAL_DIR"
+else
+    cd "$LM_EVAL_DIR"
+    echo "Repository exists, checking for updates..."
+    # Optional: Consider 'git pull' if you always want the latest version
+    # git pull
+fi
 
 # Step 2: Create directory for custom tasks and ensure __init__.py is empty
 echo "Step 2: Setting up custom task directory..."
