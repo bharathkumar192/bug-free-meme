@@ -12,7 +12,7 @@ echo "$HUGGING_FACE_TOKEN" | huggingface-cli login --token "$HUGGING_FACE_TOKEN"
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
 
-Step 1: Clone LM Evaluation Harness (or update if it exists)
+# Step 1: Clone LM Evaluation Harness (or update if it exists)
 echo "Step 1: Managing LM Evaluation Harness repository..."
 if [ ! -d "$LM_EVAL_DIR" ]; then
     git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness
