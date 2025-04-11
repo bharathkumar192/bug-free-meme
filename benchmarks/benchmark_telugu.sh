@@ -4,36 +4,36 @@
 
 set -e  # Exit on any error
 
-# Login to Hugging Face
-echo "Logging in to Hugging Face..."
-# Uncomment and add your token if login is required and not cached
-# HUGGING_FACE_TOKEN="hf_YOUR_TOKEN_HERE" 
+# Login to Hugging Face (Optional - uncomment if needed)
+# echo "Logging in to Hugging Face..."
+# HUGGING_FACE_TOKEN="hf_YOUR_TOKEN_HERE"
 # echo "$HUGGING_FACE_TOKEN" | huggingface-cli login --token "$HUGGING_FACE_TOKEN"
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
 
 # Step 1: Clone LM Evaluation Harness (or update if it exists)
-echo "Step 1: Managing LM Evaluation Harness repository..."
-if [ ! -d "$LM_EVAL_DIR" ]; then
-    git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness
-    cd "$LM_EVAL_DIR"
-else
-    cd "$LM_EVAL_DIR"
-    echo "Repository exists, pulling latest changes..."
-    # Optional: git pull # Uncomment if you want to always update to the latest version
-fi
+# echo "Step 1: Managing LM Evaluation Harness repository..."
+# if [ ! -d "$LM_EVAL_DIR" ]; then
+#     git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness
+#     cd "$LM_EVAL_DIR"
+# else
+#     cd "$LM_EVAL_DIR"
+#     echo "Repository exists, checking for updates..."
+#     # Optional: Consider 'git pull' if you always want the latest version
+#     # git pull
+# fi
 
 # Step 2: Create directory for custom tasks and ensure __init__.py is empty
 echo "Step 2: Setting up custom task directory..."
 mkdir -p lm_eval/tasks/custom
 # Ensure the init file is empty, needed for package discovery but no imports required for YAML
-> lm_eval/tasks/custom/__init__.py 
+> lm_eval/tasks/custom/__init__.py
 
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (Should be correct now)
+# Create CORRECTED indic_sentiment_te.yaml
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
 task: indic_sentiment_te
@@ -44,8 +44,10 @@ dataset_kwargs:
 output_type: multiple_choice
 test_split: test
 num_fewshot: 0
-doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ ['INDIC REVIEW'] }}"
-doc_to_target: "{% if ['LABEL'] == 'Positive' %}0{% elif ['LABEL'] == 'Negative' %}1{% elif ['LABEL'] == 'Neutral' %}2{% else %}-1{% endif %}"
+# CORRECTED: Use 'INDIC REVIEW' directly, not ['INDIC REVIEW']
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ INDIC REVIEW }}"
+# CORRECTED: Use 'LABEL' directly, not ['LABEL']
+doc_to_target: "{% if LABEL == 'Positive' %}0{% elif LABEL == 'Negative' %}1{% elif LABEL == 'Neutral' %}2{% else %}-1{% endif %}"
 doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
   - metric: acc
@@ -55,7 +57,7 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (Made doc_to_text template robust to choice list length)
+# Create CORRECTED mmlu_te.yaml
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
 task: mmlu_te
@@ -66,17 +68,18 @@ output_type: multiple_choice
 test_split: test
 num_fewshot: 0
 
-# Optional Filter: Uncomment and adjust if needed
+# Optional Filter: Uncomment and adjust if needed (ensure column name 'language' exists)
 # filter_list:
 #  - name: "filter_language_telugu"
 #    filter:
 #      - function: "regex"
-#        inputs: "language" # Replace with actual column name
+#        inputs: "language" # Verify this is the correct column name in the dataset
 #        regex_pattern: "^te$"
 
 # Modified doc_to_text to handle varying numbers of choices gracefully
 doc_to_text: "{{ question }}\n{% if choices is defined and choices|length > 0 %}\nA. {{ choices[0] }}{% endif %}{% if choices is defined and choices|length > 1 %}\nB. {{ choices[1] }}{% endif %}{% if choices is defined and choices|length > 2 %}\nC. {{ choices[2] }}{% endif %}{% if choices is defined and choices|length > 3 %}\nD. {{ choices[3] }}{% endif %}\n\nAnswer:"
-doc_to_target: "{{ answer }}" # Still assuming 'answer' contains A, B, C, or D
+# CORRECTED: Map answer letter (A,B,C,D) to index (0,1,2,3)
+doc_to_target: "{% if answer == 'A' %}0{% elif answer == 'B' %}1{% elif answer == 'C' %}2{% elif answer == 'D' %}3{% else %}-1{% endif %}"
 doc_to_choice: ["A", "B", "C", "D"]
 metric_list:
   - metric: acc
@@ -90,27 +93,28 @@ echo "Custom YAML task files created."
 
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
-# Ensure pip is up-to-date
+# Ensure pip is up-to-date (Recommended)
 # pip install --upgrade pip
-# Install lm-eval-harness editable, including multilingual extras
+# Install lm-eval-harness editable, including multilingual extras (CRITICAL)
 # pip install -e ".[multilingual]" --no-cache-dir
 
-# Step 5: List available tasks to verify registration
+# Step 5: List available tasks to verify registration (Recommended)
 echo "Step 5: Verifying task registration..."
 # Check if the custom tasks appear in the list
-# python -m lm_eval --tasks list --verbosity INFO | grep -E 'indic_sentiment_te|mmlu_te' || echo "Custom tasks not found in list, check YAML files and paths."
+# python -m lm_eval --tasks list --verbosity INFO | grep -E 'indic_sentiment_te|mmlu_te' || echo "Custom tasks not found in list, check YAML files, paths, and installation."
 
 # Step 6: Run benchmarks
 echo "Step 6: Running benchmarks with accelerate..."
 OUTPUT_DIR="../telugu_benchmark_results" # Results saved outside the git repo
 mkdir -p "$OUTPUT_DIR"
 
-MODEL_PATH="krutrim-ai-labs/Krutrim-2-instruct"
-BATCH_SIZE=auto # Use auto batch size detection if possible, adjust if OOM occurs
+# MODEL_PATH="krutrim-ai-labs/Krutrim-2-instruct"
+MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
+BATCH_SIZE=8 # Use auto batch size detection. Adjust (e.g., 4, 8, 16) if OOM occurs
 CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom) # Get absolute path
 
-# Add the main library path to PYTHONPATH in case of import issues
-export PYTHONPATH="$PYTHONPATH:$(realpath .)"
+# Add the main library path to PYTHONPATH in case of import issues (optional, usually not needed if installed with -e)
+# export PYTHONPATH="$PYTHONPATH:$(realpath .)"
 
 # Run IndicSentiment benchmark with accelerate launch
 echo "Running IndicSentiment benchmark..."
@@ -122,25 +126,26 @@ accelerate launch -m lm_eval \
     --output_path "$OUTPUT_DIR/indic_sentiment_results.json" \
     --log_samples \
     --include_path "$CUSTOM_TASKS_PATH" \
-    --verbosity DEBUG
+    --verbosity DEBUG # Use DEBUG for detailed logs, change to INFO for less output
 
 # Run MMLU benchmark with accelerate launch
-echo "Running MMLU benchmark..."
-accelerate launch -m lm_eval \
-    --model hf \
-    --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
-    --tasks mmlu_te \
-    --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR/mmlu_results.json" \
-    --log_samples \
-    --include_path "$CUSTOM_TASKS_PATH" \
-    --verbosity DEBUG
+# echo "Running MMLU benchmark..."
+# accelerate launch -m lm_eval \
+#     --model hf \
+#     --model_args pretrained="$MODEL_PATH",trust_remote_code=True \
+#     --tasks mmlu_te \
+#     --batch_size "$BATCH_SIZE" \
+#     --output_path "$OUTPUT_DIR/mmlu_results.json" \
+#     --log_samples \
+#     --include_path "$CUSTOM_TASKS_PATH" \
+#     --verbosity DEBUG # Use DEBUG for detailed logs, change to INFO for less output
 
 echo "All benchmarks completed. Results saved to $OUTPUT_DIR"
 
 # Step 7: Instructions for finding results (adjusted path)
 echo ""
 echo "After benchmarking, find your results in the ../telugu_benchmark_results directory relative to the lm-evaluation-harness folder."
-echo "From the parent directory ('bug-free-meme/benchmarks'), the path is 'telugu_benchmark_results'."
+echo "From the parent directory where you ran the script (assuming it's outside lm-evaluation-harness), the path is 'telugu_benchmark_results'."
 echo "You can copy them back to your local machine using (adjust path as needed):"
-echo "scp -r user@your-server:$(pwd)/../telugu_benchmark_results ." # Assumes you are still in lm-evaluation-harness dir
+# Adjust the source path if you run the script from a different location relative to the results dir
+echo "scp -r user@your-server:$(realpath "$OUTPUT_DIR") ."
