@@ -94,9 +94,9 @@ echo "Custom YAML task files created."
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
 # Ensure pip is up-to-date (Recommended)
-# pip install --upgrade pip
+pip install --upgrade pip
 # Install lm-eval-harness editable, including multilingual extras (CRITICAL)
-# pip install -e ".[multilingual]" --no-cache-dir
+pip install -e ".[multilingual]" --no-cache-dir
 
 # Step 5: List available tasks to verify registration (Recommended)
 echo "Step 5: Verifying task registration..."
@@ -114,7 +114,7 @@ BATCH_SIZE=8 # Use auto batch size detection. Adjust (e.g., 4, 8, 16) if OOM occ
 CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom) # Get absolute path
 
 # Add the main library path to PYTHONPATH in case of import issues (optional, usually not needed if installed with -e)
-# export PYTHONPATH="$PYTHONPATH:$(realpath .)"
+export PYTHONPATH="$PYTHONPATH:$(realpath .)"
 
 # Run IndicSentiment benchmark with accelerate launch
 echo "Running IndicSentiment benchmark..."
