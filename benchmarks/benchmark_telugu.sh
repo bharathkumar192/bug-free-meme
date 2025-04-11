@@ -33,7 +33,7 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (Using direct Jinja bracket notation for top-level keys)
+# Create indic_sentiment_te.yaml (Mapping target label to index)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
 task: indic_sentiment_te
@@ -44,9 +44,9 @@ dataset_kwargs:
 output_type: multiple_choice
 test_split: test
 num_fewshot: 0
-# Corrected Jinja2 access using direct bracket notation on keys
-doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ ['INDIC REVIEW'] }}" 
-doc_to_target: "{{ ['LABEL'] }}" 
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ ['INDIC REVIEW'] }}"
+# Map the string label to its integer index based on doc_to_choice
+doc_to_target: "{% if ['LABEL'] == 'Positive' %}0{% elif ['LABEL'] == 'Negative' %}1{% elif ['LABEL'] == 'Neutral' %}2{% else %}-1{% endif %}"
 doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
   - metric: acc
@@ -56,13 +56,16 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (No changes needed here, assuming standard keys like 'question', 'answer')
+# Create mmlu_te.yaml (MMLU likely already provides integer/letter targets, check if needed)
+# Assuming 'answer' column in sarvamai/mmlu-indic already contains 'A', 'B', 'C', or 'D' which might
+# be handled correctly by default processing or might need similar index mapping if it expects integers 0-3.
+# Let's leave it as is for now unless mmlu_te fails similarly.
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
 task: mmlu_te
 dataset_path: sarvamai/mmlu-indic
 dataset_kwargs:
-  trust_remote_code: True 
+  trust_remote_code: True
 output_type: multiple_choice
 test_split: test
 num_fewshot: 0
@@ -76,7 +79,7 @@ num_fewshot: 0
 #        regex_pattern: "^te$"
 
 doc_to_text: "{{ question }}\n\nA. {{ choices[0] }}\nB. {{ choices[1] }}\nC. {{ choices[2] }}\nD. {{ choices[3] }}\n\nAnswer:"
-doc_to_target: "{{ answer }}"
+doc_to_target: "{{ answer }}" # Check if 'answer' needs mapping to 0, 1, 2, 3 if process_results expects int
 doc_to_choice: ["A", "B", "C", "D"]
 metric_list:
   - metric: acc
@@ -87,6 +90,7 @@ metadata:
 EOL
 
 echo "Custom YAML task files created."
+
 
 
 # Step 4: Install the package with dependencies
