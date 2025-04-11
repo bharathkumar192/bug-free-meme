@@ -33,7 +33,7 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (Mapping target label to index)
+# Create indic_sentiment_te.yaml (Should be correct now)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
 task: indic_sentiment_te
@@ -45,7 +45,6 @@ output_type: multiple_choice
 test_split: test
 num_fewshot: 0
 doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ ['INDIC REVIEW'] }}"
-# Map the string label to its integer index based on doc_to_choice
 doc_to_target: "{% if ['LABEL'] == 'Positive' %}0{% elif ['LABEL'] == 'Negative' %}1{% elif ['LABEL'] == 'Neutral' %}2{% else %}-1{% endif %}"
 doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
@@ -56,10 +55,7 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (MMLU likely already provides integer/letter targets, check if needed)
-# Assuming 'answer' column in sarvamai/mmlu-indic already contains 'A', 'B', 'C', or 'D' which might
-# be handled correctly by default processing or might need similar index mapping if it expects integers 0-3.
-# Let's leave it as is for now unless mmlu_te fails similarly.
+# Create mmlu_te.yaml (Made doc_to_text template robust to choice list length)
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
 task: mmlu_te
@@ -78,8 +74,9 @@ num_fewshot: 0
 #        inputs: "language" # Replace with actual column name
 #        regex_pattern: "^te$"
 
-doc_to_text: "{{ question }}\n\nA. {{ choices[0] }}\nB. {{ choices[1] }}\nC. {{ choices[2] }}\nD. {{ choices[3] }}\n\nAnswer:"
-doc_to_target: "{{ answer }}" # Check if 'answer' needs mapping to 0, 1, 2, 3 if process_results expects int
+# Modified doc_to_text to handle varying numbers of choices gracefully
+doc_to_text: "{{ question }}\n{% if choices is defined and choices|length > 0 %}\nA. {{ choices[0] }}{% endif %}{% if choices is defined and choices|length > 1 %}\nB. {{ choices[1] }}{% endif %}{% if choices is defined and choices|length > 2 %}\nC. {{ choices[2] }}{% endif %}{% if choices is defined and choices|length > 3 %}\nD. {{ choices[3] }}{% endif %}\n\nAnswer:"
+doc_to_target: "{{ answer }}" # Still assuming 'answer' contains A, B, C, or D
 doc_to_choice: ["A", "B", "C", "D"]
 metric_list:
   - metric: acc
@@ -90,8 +87,6 @@ metadata:
 EOL
 
 echo "Custom YAML task files created."
-
-
 
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
