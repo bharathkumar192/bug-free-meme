@@ -33,7 +33,7 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (Corrected Jinja2 variable syntax)
+# Create indic_sentiment_te.yaml (Using Jinja bracket notation for keys with spaces/uppercase)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
 task: indic_sentiment_te
@@ -44,9 +44,9 @@ dataset_kwargs:
 output_type: multiple_choice
 test_split: test
 num_fewshot: 0
-# Corrected Jinja2 variable name (space replaced with underscore)
-doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ INDIC_REVIEW }}" 
-doc_to_target: "{{ LABEL }}" # Assuming LABEL is correct, verify if needed
+# Corrected Jinja2 access using bracket notation for keys with spaces/uppercase
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{ doc['INDIC REVIEW'] }}" 
+doc_to_target: "{{ doc['LABEL'] }}" 
 doc_to_choice: ["Positive", "Negative", "Neutral"]
 metric_list:
   - metric: acc
@@ -56,13 +56,13 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (No changes needed here for this error)
+# Create mmlu_te.yaml (No changes needed here, assuming standard keys)
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
 task: mmlu_te
 dataset_path: sarvamai/mmlu-indic
 dataset_kwargs:
-  trust_remote_code: True
+  trust_remote_code: True 
 output_type: multiple_choice
 test_split: test
 num_fewshot: 0
@@ -75,8 +75,8 @@ num_fewshot: 0
 #        inputs: "language" # Replace with actual column name
 #        regex_pattern: "^te$"
 
-doc_to_text: "{{ question }}\n\nA. {{ choices[0] }}\nB. {{ choices[1] }}\nC. {{ choices[2] }}\nD. {{ choices[3] }}\n\nAnswer:" # Assuming 'question' and 'choices' are correct column names
-doc_to_target: "{{ answer }}" # Assuming 'answer' is correct
+doc_to_text: "{{ question }}\n\nA. {{ choices[0] }}\nB. {{ choices[1] }}\nC. {{ choices[2] }}\nD. {{ choices[3] }}\n\nAnswer:"
+doc_to_target: "{{ answer }}"
 doc_to_choice: ["A", "B", "C", "D"]
 metric_list:
   - metric: acc
