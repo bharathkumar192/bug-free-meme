@@ -6,7 +6,7 @@ set -e  # Exit on any error
 
 # Login to Hugging Face
 echo "Logging in to Hugging Face..."
-echo "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" | huggingface-cli login
+# echo "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" | huggingface-cli login
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
