@@ -33,12 +33,14 @@ mkdir -p lm_eval/tasks/custom
 # Step 3: Create custom YAML task definitions
 echo "Step 3: Creating custom YAML task definitions..."
 
-# Create indic_sentiment_te.yaml (NO 'group' key)
+# Create indic_sentiment_te.yaml (Corrected dataset_name and added dataset_kwargs)
 cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
 # Task definition for Telugu Sentiment Analysis
-task: indic_sentiment_te # Task name is the primary identifier
+task: indic_sentiment_te
 dataset_path: ai4bharat/IndicSentiment
-dataset_name: te
+dataset_name: translation-te # Corrected configuration name
+dataset_kwargs: # Added to trust remote code for dataset loading
+  trust_remote_code: True
 output_type: multiple_choice
 training_split: train
 test_split: test
@@ -53,11 +55,13 @@ metadata:
   version: 1.0
 EOL
 
-# Create mmlu_te.yaml (NO 'group' key)
+# Create mmlu_te.yaml (Adding dataset_kwargs here too, just in case)
 cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
 # Task definition for Telugu MMLU subset
-task: mmlu_te # Task name is the primary identifier
+task: mmlu_te
 dataset_path: sarvamai/mmlu-indic
+dataset_kwargs: # Added to trust remote code (good practice if needed)
+  trust_remote_code: True 
 output_type: multiple_choice
 test_split: test
 
@@ -81,7 +85,6 @@ metadata:
 EOL
 
 echo "Custom YAML task files created."
-
 
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
