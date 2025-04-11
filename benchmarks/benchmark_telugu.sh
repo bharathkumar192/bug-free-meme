@@ -1,192 +1,120 @@
 #!/bin/bash
 # Complete Setup and Benchmarking Script for Telugu Language Model Evaluation
-# This script handles everything from installation to running benchmarks
+# This script handles everything from installation to running benchmarks using YAML task definitions
 
 set -e  # Exit on any error
 
 # Login to Hugging Face
 echo "Logging in to Hugging Face..."
-# echo "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" | huggingface-cli login
+# Uncomment and add your token if login is required and not cached
+# HUGGING_FACE_TOKEN="hf_YOUR_TOKEN_HERE" 
+# echo "$HUGGING_FACE_TOKEN" | huggingface-cli login --token "$HUGGING_FACE_TOKEN"
 
 # Define the lm-evaluation-harness directory
 LM_EVAL_DIR="lm-evaluation-harness"
 
-# Step 1: Clone LM Evaluation Harness
-echo "Step 1: Cloning LM Evaluation Harness repository..."
+# Step 1: Clone LM Evaluation Harness (or update if it exists)
+echo "Step 1: Managing LM Evaluation Harness repository..."
 if [ ! -d "$LM_EVAL_DIR" ]; then
     git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness
+    cd "$LM_EVAL_DIR"
+else
+    cd "$LM_EVAL_DIR"
+    echo "Repository exists, pulling latest changes..."
+    # Optional: git pull # Uncomment if you want to always update to the latest version
 fi
-cd "$LM_EVAL_DIR"
 
-# Step 2: Create directory for custom tasks
+# Step 2: Create directory for custom tasks and ensure __init__.py is empty
 echo "Step 2: Setting up custom task directory..."
 mkdir -p lm_eval/tasks/custom
-touch lm_eval/tasks/custom/__init__.py
+# Ensure the init file is empty, needed for package discovery but no imports required for YAML
+> lm_eval/tasks/custom/__init__.py 
 
-# Step 3: Create Python task definitions that don't use split parameter
-echo "Step 3: Creating custom Python task definitions..."
+# Step 3: Create custom YAML task definitions
+echo "Step 3: Creating custom YAML task definitions..."
 
-# First, check the TaskConfig class to see what parameters it accepts
-cat > check_taskconfig.py << 'EOL'
-from lm_eval.api.task import TaskConfig
-import inspect
-
-print("TaskConfig parameters:")
-print(inspect.signature(TaskConfig.__init__))
+# Create indic_sentiment_te.yaml
+cat > lm_eval/tasks/custom/indic_sentiment_te.yaml << 'EOL'
+# Task definition for Telugu Sentiment Analysis
+group: 
+  - custom_telugu_tasks # Optional grouping
+task: indic_sentiment_te
+dataset_path: ai4bharat/IndicSentiment
+dataset_name: te
+output_type: multiple_choice # Model needs to choose from the provided choices
+training_split: train # Specify the split for training data if needed (e.g., for fewshot)
+test_split: test      # Specify the split for evaluation
+# validation_split: # Not specified in original code
+doc_to_text: "Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{{INDIC REVIEW}}" # Jinja2 template for the input prompt
+doc_to_target: "{{LABEL}}" # Jinja2 template for the correct label column
+doc_to_choice: ["Positive", "Negative", "Neutral"] # Explicit list of choices
+metric_list:
+  - metric: acc # Standard accuracy for multiple choice
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0 # Versioning for the task definition
 EOL
 
-python check_taskconfig.py
+# Create mmlu_te.yaml
+cat > lm_eval/tasks/custom/mmlu_te.yaml << 'EOL'
+# Task definition for Telugu MMLU subset
+group: 
+  - custom_telugu_tasks # Optional grouping
+task: mmlu_te
+dataset_path: sarvamai/mmlu-indic # Dataset containing Telugu MMLU
+# dataset_name: # Optional: if the dataset has specific configurations/subsets
+output_type: multiple_choice # Model needs to choose from A, B, C, D
+test_split: test # Specify the split for evaluation
+# fewshot_split: # Define if you want few-shot examples from a different split (e.g., 'validation' or 'train')
+# num_fewshot: 0 # Explicitly set to 0 if no few-shot examples are desired (default is often 0)
 
-# Create a Python file with the minimal task definitions
-cat > lm_eval/tasks/custom/telugu_tasks.py << 'EOL'
-from lm_eval.api.task import Task
-from lm_eval.api.registry import register_task
-import datasets
+# Optional Filter: Uncomment and adjust if the dataset contains multiple languages
+# filter_list:
+#  - name: "filter_language_telugu"
+#    filter:
+#      - function: "regex" # Use regex to match language code
+#        inputs: "language" # Replace "language" with the actual column name containing the language identifier
+#        regex_pattern: "^te$" # Match 'te' exactly
 
-@register_task("indic_sentiment_te")
-class IndicSentimentTelugu(Task):
-    VERSION = 1
-    DATASET_PATH = "ai4bharat/IndicSentiment"
-    DATASET_NAME = "te"
-    
-    def has_training_docs(self):
-        return True
-    
-    def has_validation_docs(self):
-        return False
-    
-    def has_test_docs(self):
-        return True
-    
-    def training_docs(self):
-        if self._training_docs is None:
-            self._training_docs = list(self.dataset["train"])
-        return self._training_docs
-    
-    def test_docs(self):
-        if self._test_docs is None:
-            self._test_docs = list(self.dataset["test"])
-        return self._test_docs
-    
-    def validation_docs(self):
-        return []
-    
-    def doc_to_text(self, doc):
-        return f"Classify the sentiment of the following Telugu review as Positive, Negative, or Neutral:\n\n{doc['INDIC REVIEW']}"
-    
-    def doc_to_target(self, doc):
-        return doc["LABEL"]
-    
-    def process_results(self, docs, results):
-        preds = []
-        labels = []
-        for pred, doc in zip(results, docs):
-            pred_label = ["Positive", "Negative", "Neutral"][pred.argmax()]
-            preds.append(pred_label)
-            labels.append(doc["LABEL"])
-        
-        # Calculate accuracy
-        correct = sum(p == l for p, l in zip(preds, labels))
-        return {"accuracy": correct / len(docs)}
-    
-    def construct_requests(self, doc, ctx):
-        return [
-            {"doc": doc, "choices": ["Positive", "Negative", "Neutral"], "instruction": self.doc_to_text(doc)}
-        ]
-    
-    def doc_to_choice(self, doc):
-        return ["Positive", "Negative", "Neutral"]
-
-
-@register_task("mmlu_te")
-class MMLUTelugu(Task):
-    VERSION = 1
-    DATASET_PATH = "sarvamai/mmlu-indic"
-    
-    def __init__(self):
-        super().__init__()
-        self._dataset = None
-    
-    def download(self):
-        self._dataset = datasets.load_dataset(self.DATASET_PATH)
-        # Filter for Telugu samples
-        self._dataset = self._dataset.filter(lambda x: x["language"] == "te")
-    
-    def has_training_docs(self):
-        return False
-    
-    def has_validation_docs(self):
-        return False
-    
-    def has_test_docs(self):
-        return True
-    
-    def training_docs(self):
-        return []
-    
-    def validation_docs(self):
-        return []
-    
-    def test_docs(self):
-        if self._test_docs is None:
-            self._test_docs = list(self._dataset["test"])
-        return self._test_docs
-    
-    def doc_to_text(self, doc):
-        return f"{doc['question']}\n\nA. {doc['choices'][0]}\nB. {doc['choices'][1]}\nC. {doc['choices'][2]}\nD. {doc['choices'][3]}\n\nAnswer:"
-    
-    def doc_to_target(self, doc):
-        return doc["answer"]
-    
-    def process_results(self, docs, results):
-        preds = []
-        labels = []
-        
-        for pred, doc in zip(results, docs):
-            pred_label = ["A", "B", "C", "D"][pred.argmax()]
-            preds.append(pred_label)
-            labels.append(doc["answer"])
-        
-        # Calculate accuracy
-        correct = sum(p == l for p, l in zip(preds, labels))
-        return {"accuracy": correct / len(docs)}
-    
-    def construct_requests(self, doc, ctx):
-        return [
-            {"doc": doc, "choices": ["A", "B", "C", "D"], "instruction": self.doc_to_text(doc)}
-        ]
-    
-    def doc_to_choice(self, doc):
-        return ["A", "B", "C", "D"]
+doc_to_text: "{{question}}\n\nA. {{choices[0]}}\nB. {{choices[1]}}\nC. {{choices[2]}}\nD. {{choices[3]}}\n\nAnswer:" # Jinja2 template for the question and choices
+doc_to_target: "{{answer}}" # Jinja2 template for the correct answer column (expecting A, B, C, or D)
+doc_to_choice: ["A", "B", "C", "D"] # Explicit list of choices
+metric_list:
+  - metric: acc # Standard accuracy for multiple choice
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0 # Versioning for the task definition
 EOL
 
-# Update the __init__.py to import the tasks
-cat > lm_eval/tasks/custom/__init__.py << 'EOL'
-from . import telugu_tasks
-print("Successfully imported Telugu tasks!")
-EOL
+echo "Custom YAML task files created."
 
 # Step 4: Install the package with dependencies
 echo "Step 4: Installing/Re-installing dependencies..."
+# Ensure pip is up-to-date
+pip install --upgrade pip
+# Install lm-eval-harness editable, including multilingual extras
 pip install -e ".[multilingual]" --no-cache-dir
 
 # Step 5: List available tasks to verify registration
 echo "Step 5: Verifying task registration..."
-python -m lm_eval --tasks list --verbosity DEBUG
+# Check if the custom tasks appear in the list
+python -m lm_eval --tasks list --verbosity INFO | grep -E 'indic_sentiment_te|mmlu_te' || echo "Custom tasks not found in list, check YAML files and paths."
 
 # Step 6: Run benchmarks
 echo "Step 6: Running benchmarks with accelerate..."
-OUTPUT_DIR="../telugu_benchmark_results"
+OUTPUT_DIR="../telugu_benchmark_results" # Results saved outside the git repo
 mkdir -p "$OUTPUT_DIR"
 
 MODEL_PATH="bharathkumar1922001/Gemma3-12b-Indic"
-BATCH_SIZE=32
-CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom)
+BATCH_SIZE=auto # Use auto batch size detection if possible, adjust if OOM occurs
+CUSTOM_TASKS_PATH=$(realpath lm_eval/tasks/custom) # Get absolute path
 
-# Add the custom path to PYTHONPATH
+# Add the main library path to PYTHONPATH in case of import issues
 export PYTHONPATH="$PYTHONPATH:$(realpath .)"
 
-# Run IndicSentiment benchmark with standard accelerate launch
+# Run IndicSentiment benchmark with accelerate launch
 echo "Running IndicSentiment benchmark..."
 accelerate launch -m lm_eval \
     --model hf \
@@ -198,7 +126,7 @@ accelerate launch -m lm_eval \
     --include_path "$CUSTOM_TASKS_PATH" \
     --verbosity DEBUG
 
-# Run MMLU benchmark with standard accelerate launch
+# Run MMLU benchmark with accelerate launch
 echo "Running MMLU benchmark..."
 accelerate launch -m lm_eval \
     --model hf \
@@ -214,6 +142,7 @@ echo "All benchmarks completed. Results saved to $OUTPUT_DIR"
 
 # Step 7: Instructions for finding results (adjusted path)
 echo ""
-echo "After benchmarking, find your results in the ../telugu_benchmark_results directory."
-echo "You can copy them back to your local machine using:"
-echo "scp -r user@your-server:path/to/bug-free-meme/telugu_benchmark_results ."
+echo "After benchmarking, find your results in the ../telugu_benchmark_results directory relative to the lm-evaluation-harness folder."
+echo "From the parent directory ('bug-free-meme/benchmarks'), the path is 'telugu_benchmark_results'."
+echo "You can copy them back to your local machine using (adjust path as needed):"
+echo "scp -r user@your-server:$(pwd)/../telugu_benchmark_results ." # Assumes you are still in lm-evaluation-harness dir
