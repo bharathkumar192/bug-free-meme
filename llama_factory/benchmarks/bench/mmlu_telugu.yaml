@@ -1,7 +1,6 @@
 # mmlu_telugu.yaml
 task: mmlu_telugu
-dataset_path: ../tasks_data/mmlu_telugu  # Updated path
-dataset_format: json
+dataset_path: ../../../tasks_data/mmlu_telugu
 output_type: multiple_choice
 test_split: test
 validation_split: validation

@@ -44,7 +44,6 @@ def setup_task_configs():
     telugu_sentiment_yaml = """
 task: telugu_sentiment
 dataset_path: ../../../tasks_data/telugu_sentiment
-dataset_format: csv
 output_type: multiple_choice
 test_split: test
 validation_split: validation
@@ -55,12 +54,23 @@ metric_list:
   - metric: acc
     aggregation: mean
     higher_is_better: true
+  - metric: f1
+    aggregation: mean
+    higher_is_better: true
+  - metric: precision
+    aggregation: mean
+    higher_is_better: true
+  - metric: recall
+    aggregation: mean
+    higher_is_better: true
+  - metric: acc_norm
+    aggregation: mean
+    higher_is_better: true
 """
 
     mmlu_telugu_yaml = """
 task: mmlu_telugu
 dataset_path: ../../../tasks_data/mmlu_telugu
-dataset_format: json
 output_type: multiple_choice
 test_split: test
 validation_split: validation
@@ -71,6 +81,12 @@ metric_list:
   - metric: acc
     aggregation: mean
     higher_is_better: true
+  - metric: acc_norm
+    aggregation: mean
+    higher_is_better: true
+  - metric: perplexity
+    aggregation: perplexity
+    higher_is_better: false
 """
 
     # Write the files
