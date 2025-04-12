@@ -9,7 +9,7 @@ def download_and_filter_indic_sentiment():
     Download and filter the IndicSentiment dataset for Telugu.
     """
     print("Downloading IndicSentiment dataset...")
-    dataset = load_dataset("ai4bharat/IndicSentiment")
+    dataset = load_dataset("ai4bharat/IndicSentiment", "translation-te", trust_remote_code=True)
     
     # Extract Telugu reviews
     print("Filtering for Telugu data...")
@@ -18,12 +18,9 @@ def download_and_filter_indic_sentiment():
     for split in dataset:
         df = dataset[split].to_pandas()
         
-        # Only select rows with Telugu reviews
-        telugu_rows = df[df['INDIC REVIEW'].str.contains('telugu', case=False, na=False)]
-        
         # Keep only necessary columns
-        telugu_df = telugu_rows[['INDIC REVIEW', 'LABEL']].rename(
-            columns={'INDIC REVIEW': 'text', 'LABEL': 'label'}
+        telugu_df = df.rename(
+            columns={'review': 'text', 'sentiment': 'label'}
         )
         
         # Map labels to integers for easier evaluation
