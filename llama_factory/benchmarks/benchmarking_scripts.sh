@@ -5,7 +5,7 @@
 # Configuration
 MODEL_PATH="bharathkumar1922001/gemma-3-12b-pt-telugu-sft"  # Your fine-tuned model
 OUTPUT_DIR="benchmark_results"
-DEVICE="cuda:0"  # Change to your desired GPU
+DEVICE="cuda:0,1"  # Change to your desired GPU
 
 # Create output directory
 mkdir -p $OUTPUT_DIR
