@@ -9,7 +9,7 @@ def download_and_filter_mmlu_indic():
     Download and filter the MMLU Indic dataset for Telugu.
     """
     print("Downloading MMLU Indic dataset...")
-    dataset = load_dataset("sarvamai/mmlu-indic")
+    dataset = load_dataset("sarvamai/mmlu-indic", trust_remote_code=True)
     
     # Extract Telugu data
     print("Filtering for Telugu data...")
