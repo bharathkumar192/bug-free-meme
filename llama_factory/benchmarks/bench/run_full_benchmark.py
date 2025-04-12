@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument("--device", default="cuda:0",
                         help="Device to use for evaluation")
     parser.add_argument("--trust_remote_code", action="store_true",
-                        help="Whether to trust remote code")
+                        help="Trust remote code from Hugging Face")
     parser.add_argument("--skip_setup", action="store_true",
                         help="Skip setup if already done")
     

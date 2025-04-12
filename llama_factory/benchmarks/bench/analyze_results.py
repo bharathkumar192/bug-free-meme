@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
+import argparse
 
 def load_results(results_path):
     """Load results from a benchmark run"""
@@ -15,16 +16,17 @@ def load_results(results_path):
 def analyze_sentiment_results(results_dir):
     """Analyze results from the Telugu sentiment task"""
     results_file = Path(results_dir) / 'results.json'
-    samples_file = None
+    samples_files = list(Path(results_dir).glob('*telugu_sentiment.jsonl'))
     
-    # Find the samples file
-    for file in Path(results_dir).glob('*_telugu_sentiment.jsonl'):
-        samples_file = file
-        break
+    if not results_file.exists():
+        print(f"Results file not found at {results_file}")
+        return
     
-    if not samples_file:
+    if not samples_files:
         print("No samples file found for sentiment analysis")
         return
+    
+    samples_file = samples_files[0]
     
     # Load results and samples
     results = load_results(results_file)
@@ -36,59 +38,73 @@ def analyze_sentiment_results(results_dir):
     # Create DataFrame
     df = pd.DataFrame(samples)
     
-    # Analyze per-class accuracy
-    sentiment_map = {0: 'positive', 1: 'negative', 2: 'neutral'}
-    df['target_label'] = df['target'].map(sentiment_map)
-    df['correct'] = df.apply(lambda row: row['filtered_resps'][0][0] == row['target'], axis=1)
+    # Create output directory
+    analysis_dir = Path(results_dir) / 'analysis'
+    os.makedirs(analysis_dir, exist_ok=True)
     
-    class_accuracy = df.groupby('target_label')['correct'].mean()
-    
-    # Plot class accuracy
-    plt.figure(figsize=(10, 6))
-    sns.barplot(x=class_accuracy.index, y=class_accuracy.values)
-    plt.title('Accuracy by Sentiment Class')
-    plt.ylabel('Accuracy')
-    plt.xlabel('Sentiment Class')
-    plt.savefig(os.path.join(results_dir, 'sentiment_class_accuracy.png'))
-    
-    # Create a confusion matrix
-    confusion = pd.crosstab(
-        df['target_label'], 
-        df.apply(lambda row: sentiment_map[row['filtered_resps'][0][0]], axis=1),
-        normalize='index'
-    )
-    
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(confusion, annot=True, fmt='.2%', cmap='Blues')
-    plt.title('Confusion Matrix: Telugu Sentiment Analysis')
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, 'sentiment_confusion_matrix.png'))
+    # Analyze per-class accuracy if possible
+    if 'target' in df.columns and 'filtered_resps' in df.columns:
+        sentiment_map = {0: 'positive', 1: 'negative', 2: 'neutral'}
+        df['target_label'] = df['target'].apply(lambda x: sentiment_map.get(x, str(x)))
+        df['correct'] = df.apply(lambda row: row['filtered_resps'][0][0] == row['target'] 
+                              if len(row['filtered_resps']) > 0 and len(row['filtered_resps'][0]) > 0 
+                              else False, axis=1)
+        
+        class_accuracy = df.groupby('target_label')['correct'].mean()
+        
+        # Plot class accuracy
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x=class_accuracy.index, y=class_accuracy.values)
+        plt.title('Accuracy by Sentiment Class')
+        plt.ylabel('Accuracy')
+        plt.xlabel('Sentiment Class')
+        plt.savefig(analysis_dir / 'sentiment_class_accuracy.png')
+        
+        # Create confusion matrix if possible
+        try:
+            confusion = pd.crosstab(
+                df['target_label'], 
+                df.apply(lambda row: sentiment_map.get(row['filtered_resps'][0][0], 'unknown') 
+                      if len(row['filtered_resps']) > 0 and len(row['filtered_resps'][0]) > 0 
+                      else 'unknown', axis=1),
+                normalize='index'
+            )
+            
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(confusion, annot=True, fmt='.2%', cmap='Blues')
+            plt.title('Confusion Matrix: Telugu Sentiment Analysis')
+            plt.tight_layout()
+            plt.savefig(analysis_dir / 'sentiment_confusion_matrix.png')
+        except Exception as e:
+            print(f"Could not create confusion matrix: {e}")
     
     # Save analysis results
     analysis = {
-        'class_accuracy': class_accuracy.to_dict(),
-        'confusion_matrix': confusion.to_dict(),
-        'overall_accuracy': results['results']['telugu_sentiment']['acc,none']
+        'overall_accuracy': results['results'].get('telugu_sentiment', {}).get('acc,none', 'N/A')
     }
     
-    with open(os.path.join(results_dir, 'sentiment_analysis.json'), 'w') as f:
+    if 'target' in df.columns and 'filtered_resps' in df.columns:
+        analysis['class_accuracy'] = class_accuracy.to_dict() if 'class_accuracy' in locals() else {}
+    
+    with open(analysis_dir / 'sentiment_analysis.json', 'w') as f:
         json.dump(analysis, f, indent=2)
     
-    print(f"Sentiment analysis completed and saved to {results_dir}")
+    print(f"Sentiment analysis completed and saved to {analysis_dir}")
 
 def analyze_mmlu_results(results_dir):
     """Analyze results from the Telugu MMLU task"""
     results_file = Path(results_dir) / 'results.json'
-    samples_file = None
+    samples_files = list(Path(results_dir).glob('*mmlu_telugu.jsonl'))
     
-    # Find the samples file
-    for file in Path(results_dir).glob('*_mmlu_telugu.jsonl'):
-        samples_file = file
-        break
+    if not results_file.exists():
+        print(f"Results file not found at {results_file}")
+        return
     
-    if not samples_file:
+    if not samples_files:
         print("No samples file found for MMLU analysis")
         return
+    
+    samples_file = samples_files[0]
     
     # Load results and samples
     results = load_results(results_file)
@@ -100,13 +116,13 @@ def analyze_mmlu_results(results_dir):
     # Create DataFrame
     df = pd.DataFrame(samples)
     
-    # Extract topics from questions (if available)
-    # This assumes there's some structure we can use to identify topics
-    # We'll use a placeholder approach here
+    # Create output directory
+    analysis_dir = Path(results_dir) / 'analysis'
+    os.makedirs(analysis_dir, exist_ok=True)
     
     # Calculate overall accuracy
-    overall_acc = results['results']['mmlu_telugu']['acc,none']
-    norm_acc = results['results']['mmlu_telugu'].get('acc_norm,none', 'N/A')
+    overall_acc = results['results'].get('mmlu_telugu', {}).get('acc,none', 'N/A')
+    norm_acc = results['results'].get('mmlu_telugu', {}).get('acc_norm,none', 'N/A')
     
     # Create analysis summary
     analysis = {
@@ -115,13 +131,12 @@ def analyze_mmlu_results(results_dir):
         'sample_count': len(df)
     }
     
-    with open(os.path.join(results_dir, 'mmlu_analysis.json'), 'w') as f:
+    with open(analysis_dir / 'mmlu_analysis.json', 'w') as f:
         json.dump(analysis, f, indent=2)
     
-    print(f"MMLU analysis completed and saved to {results_dir}")
+    print(f"MMLU analysis completed and saved to {analysis_dir}")
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser(description="Analyze benchmark results for Telugu models")
     parser.add_argument("--results_dir", type=str, required=True,
                         help="Directory containing benchmark results")

@@ -5,6 +5,7 @@ import os
 import argparse
 import json
 import datetime
+import subprocess
 from pathlib import Path
 
 def parse_arguments():
@@ -35,20 +36,51 @@ def setup_task_configs():
     Ensure custom task configs are in the right location
     """
     src_dir = Path(".")
-    dst_dir = Path("lm_eval/tasks/custom_tasks")
+    tasks_dir = Path("lm-evaluation-harness/lm_eval/tasks/custom_tasks")
     
-    for yaml_file in ["telugu_sentiment.yaml", "mmlu_telugu.yaml"]:
-        src_file = src_dir / yaml_file
-        dst_file = dst_dir / yaml_file
-        
-        # Only copy if source exists and destination doesn't
-        if src_file.exists() and not dst_file.exists():
-            print(f"Copying {yaml_file} to {dst_dir}")
-            os.makedirs(dst_dir, exist_ok=True)
-            with open(src_file, 'r') as f_src:
-                content = f_src.read()
-                with open(dst_file, 'w') as f_dst:
-                    f_dst.write(content)
+    os.makedirs(tasks_dir, exist_ok=True)
+    
+    # Create the task YAML files directly
+    telugu_sentiment_yaml = """
+task: telugu_sentiment
+dataset_path: ../../../tasks_data/telugu_sentiment
+dataset_format: csv
+output_type: multiple_choice
+test_split: test
+validation_split: validation
+doc_to_text: "{{text}}\\nSentiment: "
+doc_to_choice: ["positive", "negative", "neutral"]
+doc_to_target: label
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+"""
+
+    mmlu_telugu_yaml = """
+task: mmlu_telugu
+dataset_path: ../../../tasks_data/mmlu_telugu
+dataset_format: json
+output_type: multiple_choice
+test_split: test
+validation_split: validation
+doc_to_text: "{{question}}\\nA. {{choices[0]}}\\nB. {{choices[1]}}\\nC. {{choices[2]}}\\nD. {{choices[3]}}\\nAnswer:"
+doc_to_choice: ["A", "B", "C", "D"]
+doc_to_target: answer
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+"""
+
+    # Write the files
+    with open(tasks_dir / "telugu_sentiment.yaml", "w") as f:
+        f.write(telugu_sentiment_yaml)
+    
+    with open(tasks_dir / "mmlu_telugu.yaml", "w") as f:
+        f.write(mmlu_telugu_yaml)
+    
+    print(f"Created task config files in {tasks_dir}")
 
 def run_benchmark(args):
     """
@@ -71,6 +103,9 @@ def run_benchmark(args):
     if args.trust_remote_code:
         model_args += ",trust_remote_code=True"
     
+    # Change directory to the lm-evaluation-harness folder
+    os.chdir("lm-evaluation-harness")
+    
     cmd = f"python -m lm_eval \
         --model {args.model_type} \
         --model_args {model_args} \
@@ -78,12 +113,15 @@ def run_benchmark(args):
         --device {args.device} \
         --batch_size {args.batch_size} \
         --num_fewshot {args.num_fewshot} \
-        --output_path {os.path.join(results_dir, 'results.json')} \
+        --output_path ../{os.path.join(results_dir, 'results.json')} \
         --include_path lm_eval/tasks/custom_tasks \
         --log_samples"
     
     print(f"Running benchmark with command:\n{cmd}")
-    os.system(cmd)
+    subprocess.run(cmd, shell=True, check=True)
+    
+    # Change back to the original directory
+    os.chdir("..")
     
     # Generate a summary report
     generate_summary(results_dir, args)
