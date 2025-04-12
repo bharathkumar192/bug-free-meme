@@ -1,1 +1,0 @@
-from . import telugu_tasks
